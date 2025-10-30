@@ -1,53 +1,132 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>🫞 Зеркало коммитов</title>
+<title>💀 Commit Rain</title>
 <style>
-  body { background: radial-gradient(circle at center, #0b0b0b, #000); color: #e0e0e0; font-family: "Courier New", monospace; text-align: center; padding: 50px; }
-  #mirror { border: 2px solid #666; border-radius: 15px; padding: 30px; background: rgba(255, 255, 255, 0.05); box-shadow: 0 0 20px #333; max-width: 600px; margin: 50px auto; }
-  button { background: #111; color: #fff; border: 1px solid #666; border-radius: 5px; padding: 10px 20px; cursor: pointer; }
-  button:hover { background: #222; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: radial-gradient(ellipse at center, #060606, #000);
+    overflow: hidden;
+    color: #0f0;
+    font-family: monospace;
+  }
+  #overlay {
+    position: absolute;
+    top: 30%;
+    width: 100%;
+    text-align: center;
+    color: #00ff9d;
+    font-size: 1.4rem;
+    text-shadow: 0 0 10px #00ff9d;
+    letter-spacing: 2px;
+    opacity: 0;
+    transition: opacity 2s;
+  }
+  canvas {
+    display: block;
+  }
 </style>
 </head>
 <body>
-<h1>🎃 Зеркало коммитов</h1>
-<div id="mirror">Тёмное зеркало ждёт тебя...</div>
-<br />
-<button onclick="see()">Заглянуть</button>
+<canvas id="c"></canvas>
+<div id="overlay">Summoning commits...</div>
+
 <script>
-async function see() {
-  const username = prompt("Введи свой GitHub username (например, dimaafonchenko)");
-  if (!username) return;
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+canvas.width = innerWidth;
+canvas.height = innerHeight;
+
+let drops = [];
+let messages = [];
+const chars = '01ABCDEFGHIJKLMNOPQRSTUVWXYZ@#$%^&*()'.split('');
+const spookyFallback = [
+  "summon(devil);", 
+  "fix: ritual bug", 
+  "feat: eternal darkness",
+  "chore: feed the demons",
+  "refactor: undead code",
+  "merge branch 'graveyard'",
+  "hotfix: prod possession",
+  "test: ghost integration"
+];
+
+function getUserFromUrl() {
+  const p = new URLSearchParams(window.location.search);
+  return p.get('user');
+}
+
+async function fetchCommits(user) {
+  const overlay = document.getElementById('overlay');
+  overlay.style.opacity = 1;
+  overlay.innerText = `Summoning commits from @${user}...`;
   try {
-    const resp = await fetch(`https://api.github.com/users/${username}/events/public`);
+    const resp = await fetch(`https://api.github.com/users/${user}/events/public`);
     const data = await resp.json();
-    const pushEvent = data.find(e => e.type === "PushEvent");
-    if (!pushEvent) {
-      document.getElementById("mirror").innerHTML = "У зеркала нет твоих коммитов... тишина...";
-      return;
-    }
-    const commits = pushEvent.payload.commits.slice(-3).reverse();
-    const time = new Date(pushEvent.created_at);
-    const hours = String(time.getHours()).padStart(2, '0');
-    const minutes = String(time.getMinutes()).padStart(2, '0');
-    const messages = commits.map(c => c.message);
-    let spookyText = `Ты коммитил в ${hours}:${minutes}...`;
-    spookyText += "<br>\u041Fоследние сообщения: <br>";
-    messages.forEach(m => { spookyText += `- \"${m}\"<br>`; });
-    const phrases = [
-      "Тень твоего кода оживает в полнолуние...",
-      "Призраки TODO шепчут тебе снова...",
-      "Тыквы смеются, когда тесты падают...",
-      "В темноте IDE что-то шуршит..."
-    ];
-    spookyText += "<br>" + phrases[Math.floor(Math.random() * phrases.length)];
-    document.getElementById("mirror").innerHTML = spookyText;
+    const commits = data
+      .filter(e => e.type === "PushEvent")
+      .flatMap(e => e.payload.commits)
+      .slice(0, 30)
+      .map(c => c.message);
+    overlay.innerText = commits.length
+      ? `The code of @${user} descends...`
+      : `No recent commits found... spirits are silent.`;
+    messages = commits.length ? commits : spookyFallback;
   } catch (err) {
-    document.getElementById("mirror").innerHTML = "Зеркало треснуло... попробуй позже.";
+    overlay.innerText = "Summoning failed. Spirits are angry.";
+    messages = spookyFallback;
+  }
+  setTimeout(() => overlay.style.opacity = 0, 3000);
+}
+
+class Drop {
+  constructor(x, y, text) {
+    this.x = x;
+    this.y = y;
+    this.text = text;
+    this.speed = 2 + Math.random() * 3;
+    this.alpha = 1;
+  }
+  draw() {
+    ctx.fillStyle = `rgba(0,255,100,${this.alpha})`;
+    ctx.fillText(this.text, this.x, this.y);
+  }
+  update() {
+    this.y += this.speed;
+    this.alpha -= 0.002;
   }
 }
+
+function animate() {
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  drops.forEach((d, i) => {
+    d.update();
+    d.draw();
+    if (d.y > canvas.height || d.alpha <= 0) drops.splice(i, 1);
+  });
+
+  if (Math.random() < 0.2 && messages.length) {
+    const msg = messages[Math.floor(Math.random() * messages.length)];
+    drops.push(new Drop(Math.random() * canvas.width, 0, msg));
+  }
+
+  requestAnimationFrame(animate);
+}
+
+function start() {
+  ctx.font = '16px monospace';
+  const user = getUserFromUrl();
+  if (user) fetchCommits(user);
+  else messages = spookyFallback;
+  animate();
+}
+
+start();
 </script>
 </body>
 </html>
