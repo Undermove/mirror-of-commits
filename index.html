@@ -15,9 +15,12 @@ body{
   align-items:center;
   justify-content:flex-start;
   min-height:100vh;
-  overflow-x:hidden;
+  overflow:hidden;
   padding:20px 0;
+  opacity:0;
+  animation:fadeIn 2s forwards;
 }
+@keyframes fadeIn{to{opacity:1;}}
 h1{
   color:#00ff9d;
   text-shadow:0 0 10px #00ff9d;
@@ -36,6 +39,28 @@ h1{
   box-shadow:0 0 40px #0f0 inset,0 0 60px #040;
   padding:20px;
   overflow:visible;
+  z-index:1;
+}
+.machine::before,.machine::after{
+  content:"";
+  position:absolute;
+  top:-50%;
+  left:-50%;
+  width:200%;
+  height:200%;
+  background:radial-gradient(circle at 50% 50%,rgba(255,255,255,0.05) 0%,rgba(0,0,0,0) 70%);
+  opacity:0.2;
+  animation:smoke 10s infinite alternate ease-in-out;
+  filter:blur(40px);
+  z-index:-1;
+}
+.machine::after{
+  animation-delay:5s;
+}
+@keyframes smoke{
+  0%{transform:translate(0,0);}
+  50%{transform:translate(10px,-10px);}
+  100%{transform:translate(-10px,10px);}
 }
 .reels{
   display:flex;
@@ -112,7 +137,6 @@ h1{
   font-size:clamp(1rem,3vw,1.2rem);
   color:#0f0;
 }
-/* 📱 адаптация: центрирование и Telegram footer */
 #footer{
   margin-top:25px;
   text-align:center;
@@ -131,11 +155,7 @@ h1{
 <h1>🪦 Open Source Resurrection Machine</h1>
 <div class="machine">
   <div id="msg">☠️ Pull the lever to see dead repositories</div>
-
-  <div class="lever" id="lever">
-    <div class="knob" id="knob"></div>
-  </div>
-
+  <div class="lever" id="lever"><div class="knob" id="knob"></div></div>
   <div class="reels">
     <div class="reel" id="r1">💀</div>
     <div class="reel" id="r2">💀</div>
@@ -143,7 +163,6 @@ h1{
   </div>
 </div>
 <div id="counter"></div>
-
 <div id="footer">
   👻 Follow the necromancer on <a href="https://t.me/dimasshortposts" target="_blank">Telegram</a>
 </div>
@@ -152,7 +171,6 @@ h1{
 <audio id="spinSound" src="https://actions.google.com/sounds/v1/ambiences/steam_engine_idle.ogg" preload="auto" loop></audio>
 <audio id="stopSound" src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg" preload="auto"></audio>
 <audio id="dingSound" src="https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg" preload="auto"></audio>
-<!-- 💸 новый звук кассы (совместимый mp3) -->
 <audio id="cashSound" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_25c4d9d739.mp3?filename=cash-register-02.mp3" preload="auto"></audio>
 
 <script>
@@ -164,7 +182,6 @@ const spinSound=document.getElementById("spinSound");
 const stopSound=document.getElementById("stopSound");
 const dingSound=document.getElementById("dingSound");
 const cashSound=document.getElementById("cashSound");
-
 let souls=Number(localStorage.getItem("soulsRevived")||0);
 counter.innerText=`✨ Souls revived today: ${souls}`;
 let isSpinning=false;
@@ -177,22 +194,19 @@ async function getRepos(){
   const data=await resp.json();
   return data.items||[];
 }
-
 function startSpin(){
-  if(isSpinning) return;
+  if(isSpinning)return;
   isSpinning=true;
   msg.innerText="⚙️ Spinning...";
   reels.forEach(r=>r.classList.add("spin"));
-  spinSound.volume=0.15;
-  spinSound.play().catch(()=>{});
+  spinSound.volume=0.15;spinSound.play().catch(()=>{});
 }
-
 function stopSpin(data){
   spinSound.pause();
   reels.forEach((r,i)=>{
     setTimeout(()=>{
       r.classList.remove("spin");
-      stopSound.currentTime=0; stopSound.volume=0.3; stopSound.play().catch(()=>{});
+      stopSound.currentTime=0;stopSound.volume=0.3;stopSound.play().catch(()=>{});
       const repo=data[i];
       if(!repo){r.innerHTML="💀 Empty tomb";return;}
       const year=new Date(repo.pushed_at).getFullYear();
@@ -201,31 +215,27 @@ function stopSpin(data){
       </div>`;
       r.onclick=()=>{
         window.open(repo.html_url,"_blank");
-        souls++; localStorage.setItem("soulsRevived",souls);
+        souls++;localStorage.setItem("soulsRevived",souls);
         counter.innerText=`✨ Souls revived today: ${souls}`;
         msg.innerText="⭐ Light a star to bless one of them";
         dingSound.play().catch(()=>{});
       };
-      if(i===2){isSpinning=false;}
+      if(i===2)isSpinning=false;
     },2200+i*600);
   });
 }
-
-/* --- Drag mechanics --- */
 let dragging=false,startY=0;
 knob.addEventListener("mousedown",e=>{dragging=true;startY=e.clientY;triggered=false;});
 window.addEventListener("mousemove",e=>{
   if(!dragging)return;
   let offset=Math.min(Math.max(e.clientY-startY,0),200);
   knob.style.transform=`translateY(${offset}px)`;
-  if(offset>100 && !triggered){
+  if(offset>100&&!triggered){
     triggered=true;
-    cashSound.currentTime=0;
-    cashSound.volume=0.4;
-    cashSound.play().catch(()=>{});
+    cashSound.currentTime=0;cashSound.volume=0.4;cashSound.play().catch(()=>{});
   }
 });
-window.addEventListener("mouseup",async e=>{
+window.addEventListener("mouseup",async()=>{
   if(!dragging)return;dragging=false;
   const offset=parseInt(knob.style.transform.replace(/\D/g,''))||0;
   knob.style.transform='translateY(0px)';
@@ -241,21 +251,17 @@ window.addEventListener("mouseup",async e=>{
     }
   }
 });
-
-/* Touch support */
 knob.addEventListener("touchstart",e=>{dragging=true;startY=e.touches[0].clientY;triggered=false;});
 window.addEventListener("touchmove",e=>{
   if(!dragging)return;
   let offset=Math.min(Math.max(e.touches[0].clientY-startY,0),200);
   knob.style.transform=`translateY(${offset}px)`;
-  if(offset>100 && !triggered){
+  if(offset>100&&!triggered){
     triggered=true;
-    cashSound.currentTime=0;
-    cashSound.volume=0.4;
-    cashSound.play().catch(()=>{});
+    cashSound.currentTime=0;cashSound.volume=0.4;cashSound.play().catch(()=>{});
   }
 });
-window.addEventListener("touchend",async e=>{
+window.addEventListener("touchend",async()=>{
   if(!dragging)return;dragging=false;
   knob.style.transform='translateY(0px)';
   startSpin();
