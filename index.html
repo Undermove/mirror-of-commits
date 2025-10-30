@@ -1,126 +1,183 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>🪦 Open Source Resurrection Machine</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>🎰 Open Source Resurrection Machine</title>
 <style>
-body {
-  background: radial-gradient(circle at center, #050505, #000);
-  color: #eee;
-  font-family: "Courier New", monospace;
-  text-align: center;
-  overflow: hidden;
+body{
+  margin:0;
+  background:radial-gradient(circle at center,#0a0a0a,#000);
+  color:#0f0;
+  font-family:"Courier New",monospace;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  height:100vh;
+  overflow:hidden;
 }
-h1 {
-  color: #00ff99;
-  text-shadow: 0 0 10px #00ff99;
-  margin-top: 30px;
+h1{
+  color:#00ff9d;
+  text-shadow:0 0 10px #00ff9d;
+  margin-bottom:20px;
 }
-#slots {
-  display: flex;
-  justify-content: center;
-  gap: 25px;
-  margin-top: 40px;
+.machine{
+  position:relative;
+  width:600px;
+  height:420px;
+  background:#111;
+  border:4px solid #0f0;
+  border-radius:25px;
+  box-shadow:0 0 40px #0f0 inset,0 0 60px #040;
+  padding:20px;
 }
-.slot {
-  width: 240px;
-  height: 160px;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid #222;
-  border-radius: 12px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  box-shadow: 0 0 15px #0f0;
-  transition: transform 0.8s ease-out;
-  transform-style: preserve-3d;
+.reels{
+  display:flex;
+  justify-content:center;
+  gap:25px;
+  perspective:900px;
+  margin-top:40px;
 }
-.slot.spin {
-  animation: spin 1s linear infinite;
+.reel{
+  width:140px;
+  height:200px;
+  background:#020;
+  border:2px solid #0f0;
+  border-radius:10px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:1.1rem;
+  color:#0f0;
+  box-shadow:inset 0 0 20px #000;
+  transform-style:preserve-3d;
 }
-@keyframes spin {
-  0% { transform: rotateY(0deg); }
-  100% { transform: rotateY(360deg); }
+.reel.spin{
+  animation:spin 0.5s linear infinite;
 }
-button {
-  background: #111;
-  color: #00ff99;
-  border: 1px solid #00ff99;
-  padding: 10px 25px;
-  font-size: 1.2rem;
-  cursor: pointer;
-  margin-top: 25px;
-  transition: 0.2s;
+@keyframes spin{
+  from{transform:rotateX(0deg);}
+  to{transform:rotateX(-360deg);}
 }
-button:hover { background: #00ff99; color: #000; }
-a {
-  color: #00ffaa;
-  text-decoration: none;
+button{
+  background:#000;
+  color:#0f0;
+  border:2px solid #0f0;
+  border-radius:8px;
+  font-size:1.3rem;
+  padding:10px 30px;
+  margin-top:25px;
+  cursor:pointer;
+  transition:0.2s;
 }
-a:hover { text-decoration: underline; }
-#msg { margin-top: 25px; opacity: 0.8; }
-#counter { margin-top: 10px; color: #00ffaa; font-size: 1.1rem; }
+button:hover{
+  background:#0f0;
+  color:#000;
+}
+#msg{margin-top:15px;font-size:1rem;opacity:0.8;}
+#counter{margin-top:10px;color:#0f0;}
+/* lever (decor) */
+.lever{
+  position:absolute;
+  right:-50px;
+  top:120px;
+  width:15px;
+  height:160px;
+  background:#333;
+  border:2px solid #0f0;
+  border-radius:10px;
+}
+.lever::after{
+  content:'';
+  position:absolute;
+  bottom:-25px;
+  left:-10px;
+  width:35px;
+  height:35px;
+  background:#800;
+  border:2px solid #0f0;
+  border-radius:50%;
+  box-shadow:0 0 15px red;
+}
 </style>
 </head>
 <body>
 <h1>🪦 Open Source Resurrection Machine</h1>
-<p>Spin to find legendary repos lost in time... and give them a star ⭐</p>
-
-<div id="slots">
-  <div class="slot">💀</div>
-  <div class="slot">💀</div>
-  <div class="slot">💀</div>
+<div class="machine">
+  <div class="lever"></div>
+  <div class="reels">
+    <div class="reel" id="r1">💀</div>
+    <div class="reel" id="r2">💀</div>
+    <div class="reel" id="r3">💀</div>
+  </div>
+  <button id="spin">🎰 SPIN</button>
+  <div id="msg"></div>
+  <div id="counter"></div>
 </div>
 
-<button id="spin">🎰 SPIN</button>
-<div id="msg"></div>
-<div id="counter"></div>
+<audio id="spinSound" src="https://cdn.jsdelivr.net/gh/anars/blank-audio/1-second-of-silence.mp3" preload="auto"></audio>
+<audio id="dingSound" src="https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg" preload="auto"></audio>
 
 <script>
-const msg = document.getElementById("msg");
-const counter = document.getElementById("counter");
-const slots = document.querySelectorAll(".slot");
+const reels=document.querySelectorAll(".reel");
+const spinBtn=document.getElementById("spin");
+const msg=document.getElementById("msg");
+const counter=document.getElementById("counter");
+const spinSound=document.getElementById("spinSound");
+const dingSound=document.getElementById("dingSound");
+let souls=Number(localStorage.getItem("soulsRevived")||0);
+counter.innerText=`✨ Souls revived today: ${souls}`;
 
-let souls = Number(localStorage.getItem("soulsRevived") || 0);
-counter.innerText = `✨ Souls revived today: ${souls}`;
-
-async function spin() {
-  msg.innerText = "Summoning forgotten legends...";
-  slots.forEach(s => { s.classList.add("spin"); s.innerText = "💀"; });
-
-  const page = Math.floor(Math.random() * 30) + 1;
-  const url = `https://api.github.com/search/repositories?q=stars:>1000+pushed:<2021-01-01+archived:false&sort=stars&order=desc&per_page=3&page=${page}`;
-
-  try {
-    const resp = await fetch(url);
-    const data = await resp.json();
-    await new Promise(r => setTimeout(r, 2000)); // imitate spin time
-    slots.forEach(s => s.classList.remove("spin"));
-
-    data.items.forEach((repo, i) => {
-      const year = new Date(repo.pushed_at).getFullYear();
-      slots[i].innerHTML = `
-        <h3>🪦 ${repo.name}</h3>
-        <p>${repo.stargazers_count} ⭐ · last commit: ${year}</p>
-        <p><a href="${repo.html_url}" target="_blank">Bless this repo ↗</a></p>
-      `;
-      const link = slots[i].querySelector("a");
-      link.addEventListener("click", () => {
-        souls++;
-        localStorage.setItem("soulsRevived", souls);
-        counter.innerText = `✨ Souls revived today: ${souls}`;
-        msg.innerText = "💫 A lost repo feels warmth again...";
-      });
-    });
-  } catch (e) {
-    msg.innerText = "⚠️ Spirits refused to answer.";
-    slots.forEach(s => s.classList.remove("spin"));
-  }
+async function getRepos(){
+  const page=Math.floor(Math.random()*30)+1;
+  const url=`https://api.github.com/search/repositories?q=stars:>1000+pushed:<2021-01-01+archived:false&sort=stars&order=desc&per_page=3&page=${page}`;
+  const resp=await fetch(url);
+  const data=await resp.json();
+  return data.items||[];
 }
 
-document.getElementById("spin").onclick = spin;
+function startSpin(){
+  msg.innerText="⚙️ Spinning the machine...";
+  reels.forEach(r=>r.classList.add("spin"));
+  spinSound.play();
+}
+
+function stopSpin(data){
+  reels.forEach((r,i)=>{
+    setTimeout(()=>{
+      r.classList.remove("spin");
+      const repo=data[i];
+      if(!repo){r.innerHTML="💀 Empty tomb";return;}
+      const year=new Date(repo.pushed_at).getFullYear();
+      r.innerHTML=`<div style="text-align:center">
+      <strong>🪦 ${repo.name}</strong><br>
+      ⭐ ${repo.stargazers_count}<br>
+      🕰 ${year}<br>
+      <a href="${repo.html_url}" target="_blank" style="color:#0f0;text-decoration:none;">Bless ↗</a>
+      </div>`;
+      r.querySelector("a").onclick=()=>{
+        souls++;
+        localStorage.setItem("soulsRevived",souls);
+        counter.innerText=`✨ Souls revived today: ${souls}`;
+        msg.innerText="💫 One forgotten repo feels warmth again...";
+        dingSound.play();
+      };
+      if(i===2) msg.innerText="Choose one to bless ⭐";
+    },2500+i*600);
+  });
+}
+
+spinBtn.onclick=async()=>{
+  startSpin();
+  try{
+    const data=await getRepos();
+    setTimeout(()=>stopSpin(data),2500);
+  }catch(e){
+    msg.innerText="⚠️ Spirits refused to answer.";
+    reels.forEach(r=>r.classList.remove("spin"));
+  }
+};
 </script>
 </body>
 </html>
