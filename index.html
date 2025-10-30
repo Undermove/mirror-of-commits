@@ -351,22 +351,27 @@ function stopSpin(data){
       stopSound.volume=0.25;
       stopSound.play().catch(()=>{});
       const repo=data[i];
-      if(!repo){ r.innerHTML="💀 Empty tomb"; return; }
-      const year=new Date(repo.pushed_at).getFullYear();
-      r.innerHTML=`<div class="card">
-        <strong class="name">🪦 ${repo.name}</strong>
-        <div class="meta">⭐ ${repo.stargazers_count}</div>
-        <div class="meta">💀 ${year}</div>
-      </div>`;
-      r.onclick=()=>{
-        window.open(repo.html_url,"_blank");
-        souls++;
-        localStorage.setItem("soulsRevived",souls);
-        counter.innerText=`✨ Souls revived today: ${souls}`;
-        msg.innerText="⭐ Light a star to bless one of them";
-        dingSound.play().catch(()=>{});
-      };
-      r.setAttribute('aria-label', `${repo.full_name||repo.name} — ${repo.stargazers_count} stars, last update ${year}`);
+      if(!repo){
+        r.innerHTML="💀 Empty tomb";
+        r.onclick=null;
+        r.removeAttribute('aria-label');
+      } else {
+        const year=new Date(repo.pushed_at).getFullYear();
+        r.innerHTML=`<div class="card">
+          <strong class="name">🪦 ${repo.name}</strong>
+          <div class="meta">⭐ ${repo.stargazers_count}</div>
+          <div class="meta">💀 ${year}</div>
+        </div>`;
+        r.onclick=()=>{
+          window.open(repo.html_url,"_blank");
+          souls++;
+          localStorage.setItem("soulsRevived",souls);
+          counter.innerText=`✨ Souls revived today: ${souls}`;
+          msg.innerText="⭐ Light a star to bless one of them";
+          dingSound.play().catch(()=>{});
+        };
+        r.setAttribute('aria-label', `${repo.full_name||repo.name} — ${repo.stargazers_count} stars, last update ${year}`);
+      }
       if(i===2){
         isSpinning=false;
         msg.innerText="⭐ Light a star to bless one of them";
