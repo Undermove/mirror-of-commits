@@ -415,7 +415,7 @@ function stopSpin(data){
         r.innerHTML=`<div class="card">
           <strong class="name">🪦 ${repo.name}</strong>
           <div class="meta">⭐ ${repo.stargazers_count}</div>
-          <div class="meta">💀 ${year}</div>
+          <div class="meta" title="Year of last commit">💀 ${year}</div>
         </div>`;
         r.onclick=async ()=>{
           window.open(repo.html_url,"_blank");
