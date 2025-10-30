@@ -130,7 +130,7 @@ h1 {
   width:16px;
   height: clamp(120px, 24vw, 170px);
   background: transparent;
-  border:2px solid #ff70ff;
+  border:none;
   border-radius:10px;
   cursor:pointer;
   display:flex;
@@ -148,11 +148,14 @@ h1 {
   inset:0;
   background:#330033;
   border-radius:inherit;
+  border:2px solid #ff70ff;
+  box-sizing: border-box;
   transform-origin:center;
   transform: scaleX(var(--shaftScale, 1));
   clip-path: inset(var(--shaftTop, 0px) 0 0 0);
   transition: transform 0.06s linear, clip-path 0.06s linear;
 }
+.lever.dragging::before{ transition: none; }
 .knob {
   width:32px;
   height:32px;
@@ -165,23 +168,22 @@ h1 {
   transition:transform 0.3s;
   animation:pulse 1.5s ease-in-out infinite alternate;
   will-change: transform;
-  z-index:2;
 }
 @keyframes pulse {
   from{box-shadow:0 0 10px #f80;}
-  to{box-shadow:0 0 25px #ffb347;}
 }
-.knob.dragging{transform:translateY(120px);}
+.knob.dragging{ transition: none; animation: none; }
 #counter {
   margin-top:10px;
   text-align:center;
-  font-size:clamp(0.9rem,3vw,1.1rem);
+  font-size: clamp(0.9rem,3vw,1.1rem);
   color:#ffb4ff;
   text-shadow:0 0 10px #ff70ff;
 }
 #footer {
   margin-top:10px;
   text-align:center;
+{{ ... }}
   font-size:clamp(0.8rem,3vw,1rem);
   color:#ffb4ff;
 }
@@ -297,7 +299,7 @@ function stopSpin(data){
       r.innerHTML=`<div class="card">
         <strong class="name">🪦 ${repo.name}</strong>
         <div class="meta">⭐ ${repo.stargazers_count}</div>
-        <div class="meta">🕰 ${year}</div>
+        <div class="meta">💀 ${year}</div>
       </div>`;
       r.onclick=()=>{
         window.open(repo.html_url,"_blank");
@@ -314,7 +316,11 @@ function stopSpin(data){
 }
 
 // Dragging logic (mouse + touch) with threshold
-function handleStart(y){ dragging=true; startY=y; triggered=false; currentOffset=0; }
+function handleStart(y){
+  dragging=true; startY=y; triggered=false; currentOffset=0;
+  knob.classList.add('dragging');
+  lever.classList.add('dragging');
+}
 function handleMove(y){
   if(!dragging) return;
   currentOffset=Math.min(Math.max(y-startY,0),120);
@@ -330,6 +336,8 @@ function handleMove(y){
 }
 async function handleEnd(){
   if(!dragging) return; dragging=false;
+  knob.classList.remove('dragging');
+  lever.classList.remove('dragging');
   knob.style.transform='translateY(0px) scale(1)';
   lever.style.setProperty('--shaftScale', '1');
   lever.style.setProperty('--shaftTop', '0px');
