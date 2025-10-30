@@ -293,7 +293,7 @@ footer#footer {
     </div>
     <p id="counter" aria-live="polite"></p>
   </main>
-  <footer id="footer">⭐ If you enjoy this project, please star the repository or follow me on <a href="https://t.me/dimasshortposts" target="_blank" rel="noopener noreferrer">Telegram</a></footer>
+  <footer id="footer">⭐ If you enjoy this project, please <a href="https://github.com/Undermove/open-source-resurrection-machine" target="_blank" rel="noopener noreferrer">star the repository</a> or follow me on <a href="https://t.me/dimasshortposts" target="_blank" rel="noopener noreferrer">Telegram</a></footer>
 
 <!-- sounds -->
 <audio id="spinSound" src="https://orangefreesounds.com/wp-content/uploads/2024/12/Slot-machine-sound-effect.mp3" preload="auto" loop></audio>
@@ -407,7 +407,7 @@ function stopSpin(data){
       stopSound.play().catch(()=>{});
       const repo=data[i];
       if(!repo){
-        r.innerHTML="💀 Empty tomb";
+        r.innerHTML="💀 Empty tomb. </br>Spin more";
         r.onclick=null;
         r.removeAttribute('aria-label');
       } else {
