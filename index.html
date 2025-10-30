@@ -323,11 +323,16 @@ function computeSouls(){ const diff=Math.max(0, Date.now()-START_MS); return Mat
 let souls = computeSouls();
 setCounterText(souls);
 (function schedule(){
-  const now=Date.now();
-  const offset=(now-START_MS)%5000;
-  const next=5000-offset;
-  setTimeout(function tick(){ souls=computeSouls(); setCounterText(souls); setTimeout(tick,5000); }, next);
+  function randMs(){ return (Math.floor(Math.random()*30)+1)*1000; } // 1..30s
+  function scheduleNext(){ setTimeout(tick, randMs()); }
+  function tick(){
+    souls = Math.max(0, Math.floor((Date.now() - START_MS)/5000)); // initial baseline
+    setCounterText(souls);
+    scheduleNext();
+  }
+  scheduleNext();
 })();
+
 let isSpinning=false,triggered=false,currentOffset=0,startY=0,dragging=false;
 
 // Mute handling
