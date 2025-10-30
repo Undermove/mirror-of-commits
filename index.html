@@ -6,10 +6,8 @@
 <title>🎰 Open Source Resurrection Machine</title>
 <style>
 body{
-  margin:0;
-  background:radial-gradient(circle at center,#0a0a0a,#000);
-  color:#0f0;
-  font-family:"Courier New",monospace;
+  margin:0;background:radial-gradient(circle at center,#0a0a0a,#000);
+  color:#0f0;font-family:"Courier New",monospace;
   display:flex;flex-direction:column;align-items:center;justify-content:center;
   height:100vh;overflow:hidden;
 }
@@ -17,7 +15,7 @@ h1{color:#00ff9d;text-shadow:0 0 10px #00ff9d;margin-bottom:10px;}
 .machine{
   position:relative;width:600px;height:420px;
   background:#111;border:4px solid #0f0;border-radius:25px;
-  box-shadow:0 0 40px #0f0 inset,0 0 60px #040;padding:20px;
+  box-shadow:0 0 40px #0f0 inset,0 0 60px #040;padding:20px;overflow:hidden;
 }
 .reels{
   display:flex;justify-content:center;gap:25px;perspective:900px;margin-top:40px;
@@ -28,52 +26,64 @@ h1{color:#00ff9d;text-shadow:0 0 10px #00ff9d;margin-bottom:10px;}
   font-size:1.1rem;color:#0f0;box-shadow:inset 0 0 20px #000;
   transform-style:preserve-3d;cursor:pointer;transition:0.3s;
 }
-.reel:hover{box-shadow:0 0 15px #0f0;}
 .reel.spin{animation:spin 0.5s linear infinite;}
 @keyframes spin{from{transform:rotateX(0deg);}to{transform:rotateX(-360deg);}}
-#msg{margin-top:25px;font-size:1rem;opacity:0.8;text-align:center;width:80%;}
+#msg{
+  position:absolute;top:10px;left:0;width:100%;
+  text-align:center;font-size:1rem;opacity:0.85;
+  animation:floatText 3s ease-in-out infinite alternate;
+}
+@keyframes floatText{
+  from{transform:translateY(0px);}to{transform:translateY(6px);}
+}
 #counter{margin-top:10px;color:#0f0;}
 /* lever */
 .lever{
-  position:absolute;right:-60px;top:100px;width:20px;height:180px;
+  position:absolute;right:-50px;top:30px;width:20px;height:240px;
   background:#333;border:2px solid #0f0;border-radius:10px;cursor:pointer;
-  transform-origin:top center;transition:transform 0.3s;
+  display:flex;flex-direction:column;align-items:center;
+  justify-content:flex-start;
 }
-.lever::after{
-  content:'';position:absolute;bottom:-30px;left:-12px;width:44px;height:44px;
-  background:#800;border:2px solid #0f0;border-radius:50%;box-shadow:0 0 15px red;
+.knob{
+  width:40px;height:40px;background:#800;border:2px solid #0f0;
+  border-radius:50%;box-shadow:0 0 15px red;position:relative;top:-20px;
+  transition:transform 0.3s;
 }
-.lever.pulled{transform:rotate(35deg);}
+.knob.dragging{transform:translateY(160px);}
 </style>
 </head>
 <body>
 <h1>🪦 Open Source Resurrection Machine</h1>
 <div class="machine">
-  <div class="lever" id="lever" title="Pull the lever"></div>
+  <div id="msg">☠️ Pull the lever to see dead repositories</div>
+  <div class="lever" id="lever">
+    <div class="knob" id="knob"></div>
+  </div>
   <div class="reels">
     <div class="reel" id="r1">💀</div>
     <div class="reel" id="r2">💀</div>
     <div class="reel" id="r3">💀</div>
   </div>
-  <div id="msg">☠️ Pull the lever to see dead repositories</div>
   <div id="counter"></div>
 </div>
 
-<audio id="spinSound" src="https://actions.google.com/sounds/v1/transportation/train_wheels_loop.ogg" preload="auto"></audio>
+<audio id="spinSound" src="https://actions.google.com/sounds/v1/ambiences/steam_engine_idle.ogg" preload="auto" loop></audio>
+<audio id="stopSound" src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg" preload="auto"></audio>
 <audio id="dingSound" src="https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg" preload="auto"></audio>
 
 <script>
 const reels=document.querySelectorAll(".reel");
-const lever=document.getElementById("lever");
+const knob=document.getElementById("knob");
 const msg=document.getElementById("msg");
 const counter=document.getElementById("counter");
 const spinSound=document.getElementById("spinSound");
+const stopSound=document.getElementById("stopSound");
 const dingSound=document.getElementById("dingSound");
 let souls=Number(localStorage.getItem("soulsRevived")||0);
 counter.innerText=`✨ Souls revived today: ${souls}`;
-
 let isSpinning=false;
 
+/* --- API --- */
 async function getRepos(){
   const page=Math.floor(Math.random()*30)+1;
   const url=`https://api.github.com/search/repositories?q=stars:>1000+pushed:<2021-01-01+archived:false&sort=stars&order=desc&per_page=3&page=${page}`;
@@ -82,64 +92,73 @@ async function getRepos(){
   return data.items||[];
 }
 
+/* --- Spin control --- */
 function startSpin(){
   if(isSpinning) return;
   isSpinning=true;
-  lever.classList.add("pulled");
   msg.innerText="⚙️ Spinning...";
   reels.forEach(r=>r.classList.add("spin"));
+  spinSound.volume=0.2;
   spinSound.play();
 }
-
 function stopSpin(data){
+  spinSound.pause();
   reels.forEach((r,i)=>{
     setTimeout(()=>{
       r.classList.remove("spin");
+      stopSound.currentTime=0;
+      stopSound.volume=0.4;
+      stopSound.play();
       const repo=data[i];
       if(!repo){r.innerHTML="💀 Empty tomb";return;}
       const year=new Date(repo.pushed_at).getFullYear();
       r.innerHTML=`<div style="text-align:center;pointer-events:none">
-      <strong>🪦 ${repo.name}</strong><br>
-      ⭐ ${repo.stargazers_count}<br>🕰 ${year}
+        <strong>🪦 ${repo.name}</strong><br>⭐ ${repo.stargazers_count}<br>🕰 ${year}
       </div>`;
-      r.onclick=()=>{window.open(repo.html_url,"_blank");souls++;
+      r.onclick=()=>{
+        window.open(repo.html_url,"_blank");
+        souls++;
         localStorage.setItem("soulsRevived",souls);
         counter.innerText=`✨ Souls revived today: ${souls}`;
         msg.innerText="⭐ Light a star to bless one of them";
         dingSound.play();
       };
-      if(i===2){
-        msg.innerText="⭐ Light a star to bless one of them";
-        lever.classList.remove("pulled");
-        isSpinning=false;
-      }
+      if(i===2){isSpinning=false;}
     },2200+i*600);
   });
 }
 
-async function pullLever(){
+/* --- Lever drag mechanics --- */
+let dragging=false,startY=0;
+knob.addEventListener("mousedown",e=>{dragging=true;startY=e.clientY;});
+window.addEventListener("mousemove",e=>{
+  if(!dragging)return;
+  let offset=Math.min(Math.max(e.clientY-startY,0),160);
+  knob.style.transform=`translateY(${offset}px)`;
+});
+window.addEventListener("mouseup",async e=>{
+  if(!dragging)return;dragging=false;
+  const offset=parseInt(knob.style.transform.replace(/\D/g,''))||0;
+  knob.style.transform='translateY(0px)';
+  if(offset>100){startSpin();try{
+    const data=await getRepos();setTimeout(()=>stopSpin(data),2500);
+  }catch(e){msg.innerText="⚠️ Spirits refused to answer.";reels.forEach(r=>r.classList.remove("spin"));isSpinning=false;}}
+});
+
+knob.addEventListener("touchstart",e=>{dragging=true;startY=e.touches[0].clientY;});
+window.addEventListener("touchmove",e=>{
+  if(!dragging)return;
+  let offset=Math.min(Math.max(e.touches[0].clientY-startY,0),160);
+  knob.style.transform=`translateY(${offset}px)`;
+});
+window.addEventListener("touchend",async e=>{
+  if(!dragging)return;dragging=false;
+  knob.style.transform='translateY(0px)';
   startSpin();
   try{
     const data=await getRepos();
     setTimeout(()=>stopSpin(data),2500);
-  }catch(e){
-    msg.innerText="⚠️ Spirits refused to answer.";
-    reels.forEach(r=>r.classList.remove("spin"));
-    lever.classList.remove("pulled");
-    isSpinning=false;
-  }
-}
-
-let dragging=false,startY=0;
-lever.addEventListener("mousedown",e=>{dragging=true;startY=e.clientY;});
-window.addEventListener("mouseup",e=>{
-  if(!dragging)return;dragging=false;
-  if(startY && e.clientY-startY>60){pullLever();}
-});
-lever.addEventListener("touchstart",e=>{dragging=true;startY=e.touches[0].clientY;});
-window.addEventListener("touchend",e=>{
-  if(!dragging)return;dragging=false;
-  if(startY && e.changedTouches[0].clientY-startY>60){pullLever();}
+  }catch(e){msg.innerText="⚠️ Spirits refused to answer.";reels.forEach(r=>r.classList.remove("spin"));isSpinning=false;}
 });
 </script>
 </body>
