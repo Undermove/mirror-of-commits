@@ -209,6 +209,21 @@ h1 {
   font-family: inherit;
 }
 
+/* Sound toggle button */
+.sound-toggle{
+  position:absolute;
+  top:8px;
+  right:8px;
+  background:#1b001b;
+  color:#ffaaff;
+  border:1px solid #ff70ff;
+  border-radius:6px;
+  padding:4px 8px;
+  font-family: inherit;
+  cursor:pointer;
+}
+.sound-toggle:focus-visible{ outline:2px dashed #ff70ff; outline-offset:2px; }
+
 /* Larger screens tweaks */
 @media (min-width: 640px){
   .machine { min-height: 330px; }
@@ -240,6 +255,7 @@ footer#footer {
   <main id="content">
     <div class="machine-row">
       <section class="machine" aria-label="Slot machine">
+        <button id="muteToggle" class="sound-toggle" type="button" aria-pressed="false" aria-label="Toggle sound">🔊</button>
         <p id="msg">☠️ Pull the lever to see dead repositories -></p>
         <div class="reels" role="list" aria-live="polite" aria-atomic="true">
           <div class="reel" id="r1" role="listitem" tabindex="0">💀</div>
@@ -284,6 +300,7 @@ footer#footer {
 <audio id="stopSound" src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg" preload="auto"></audio>
 <audio id="dingSound" src="https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg" preload="auto"></audio>
 <audio id="cashSound" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_25c4d9d739.mp3?filename=cash-register-02.mp3" preload="auto"></audio>
+<audio id="leverSound" src="https://orangefreesounds.com/wp-content/uploads/2022/06/Lever-pull-sound-effect.mp3" preload="auto"></audio>
 
 <script>
 const reels=document.querySelectorAll(".reel");
@@ -296,10 +313,28 @@ const spinSound=document.getElementById("spinSound");
 const stopSound=document.getElementById("stopSound");
 const dingSound=document.getElementById("dingSound");
 const cashSound=document.getElementById("cashSound");
+const leverSound=document.getElementById("leverSound");
+const muteToggle=document.getElementById("muteToggle");
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 let souls=Number(localStorage.getItem("soulsRevived")||0);
 counter.innerText=`✨ Souls revived today: ${souls}`;
 let isSpinning=false,triggered=false,currentOffset=0,startY=0,dragging=false;
+
+// Mute handling
+let isMuted = localStorage.getItem('muted') === 'true';
+function applyMute(m){ [spinSound, stopSound, dingSound, cashSound, leverSound].forEach(a=>{ if(a) a.muted = m; }); }
+function updateMuteUI(){ if(!muteToggle) return; muteToggle.setAttribute('aria-pressed', String(isMuted)); muteToggle.textContent = isMuted ? '🔇' : '🔊'; }
+applyMute(isMuted);
+updateMuteUI();
+if(muteToggle){
+  muteToggle.addEventListener('click', ()=>{
+    isMuted = !isMuted;
+    localStorage.setItem('muted', String(isMuted));
+    applyMute(isMuted);
+    updateMuteUI();
+    if(isMuted){ try{ spinSound.pause(); }catch(_){} }
+  });
+}
 
 // Initialize language filter from localStorage
 if(langFilter){
@@ -396,7 +431,7 @@ function handleMove(y){
   lever.style.setProperty('--shaftScale', shaftScale.toFixed(3));
   lever.style.setProperty('--shaftTop', `${Math.round(currentOffset)}px`);
   if(currentOffset>90 && !triggered){
-    triggered=true; cashSound.currentTime=0; cashSound.volume=0.4; cashSound.play().catch(()=>{});
+    triggered=true; leverSound.currentTime=0; leverSound.volume=0.6; leverSound.play().catch(()=>{});
   }
 }
 async function handleEnd(){
@@ -432,6 +467,7 @@ window.addEventListener('touchend', ()=>{ handleEnd(); });
 // Click lever (keyboard/assistive)
 lever.addEventListener('click', async ()=>{
   if(isSpinning) return;
+  try{ leverSound.currentTime=0; leverSound.volume=0.6; leverSound.play().catch(()=>{}); }catch(_){}
   startSpin();
   try{
     const data=await getRepos();
