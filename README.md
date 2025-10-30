@@ -12,17 +12,7 @@ A spooky slot machine that resurfaces once-great, now-dormant open source reposi
 
 If the embedded preview does not render on GitHub (iframes are often sanitized), use the direct link below.
 
-- Live preview: https://htmlpreview.github.io/?https://github.com/Undermove/open-source-resurrection-machine/blob/main/index.html
-
-### Embedded preview (may be hidden by GitHub)
-
-<iframe
-  src="https://htmlpreview.github.io/?https://github.com/Undermove/open-source-resurrection-machine/blob/main/index.html"
-  width="100%"
-  height="700"
-  style="border:1px solid #ccc; border-radius:8px"
-  title="Open Source Resurrection Machine"
-></iframe>
+- Live preview: [here](https://htmlpreview.github.io/?https://github.com/Undermove/open-source-resurrection-machine/blob/main/index.html)
 
 ## Run locally
 
