@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
 <title>🎰 Open Source Resurrection Machine</title>
 <style>
 body{
@@ -13,19 +13,23 @@ body{
   display:flex;
   flex-direction:column;
   align-items:center;
-  justify-content:center;
-  height:100vh;
-  overflow:hidden;
+  justify-content:flex-start;
+  min-height:100vh;
+  overflow-x:hidden;
+  padding:20px 0;
 }
 h1{
   color:#00ff9d;
   text-shadow:0 0 10px #00ff9d;
-  margin-bottom:10px;
+  margin:10px 0 5px 0;
+  text-align:center;
+  font-size:clamp(1.2rem,5vw,1.8rem);
 }
 .machine{
   position:relative;
-  width:600px;
-  height:420px;
+  width:min(90vw,600px);
+  height:auto;
+  aspect-ratio:3/2;
   background:#111;
   border:4px solid #0f0;
   border-radius:25px;
@@ -36,20 +40,23 @@ h1{
 .reels{
   display:flex;
   justify-content:center;
-  gap:25px;
+  gap:3vw;
   perspective:900px;
   margin-top:40px;
 }
 .reel{
-  width:140px;
-  height:200px;
+  flex:1;
+  min-width:90px;
+  max-width:140px;
+  height:30vh;
+  max-height:200px;
   background:#020;
   border:2px solid #0f0;
   border-radius:10px;
   display:flex;
   align-items:center;
   justify-content:center;
-  font-size:1.1rem;
+  font-size:clamp(0.9rem,3vw,1.1rem);
   color:#0f0;
   box-shadow:inset 0 0 20px #000;
   transform-style:preserve-3d;
@@ -59,32 +66,76 @@ h1{
 .reel.spin{animation:spin 0.5s linear infinite;}
 @keyframes spin{from{transform:rotateX(0deg);}to{transform:rotateX(-360deg);}}
 #msg{
-  position:absolute;top:10px;left:0;width:100%;
-  text-align:center;font-size:1rem;opacity:0.85;
+  position:absolute;
+  top:10px;
+  left:0;
+  width:100%;
+  text-align:center;
+  font-size:clamp(0.8rem,3vw,1rem);
+  opacity:0.85;
   animation:floatText 3s ease-in-out infinite alternate;
 }
 @keyframes floatText{from{transform:translateY(0);}to{transform:translateY(6px);}}
 .lever{
-  position:absolute;right:-30px;top:20px;width:20px;height:280px;
-  background:#333;border:2px solid #0f0;border-radius:10px;cursor:pointer;
-  display:flex;flex-direction:column;align-items:center;justify-content:flex-start;z-index:5;
+  position:absolute;
+  right:-25px;
+  top:15px;
+  width:18px;
+  height:220px;
+  background:#333;
+  border:2px solid #0f0;
+  border-radius:10px;
+  cursor:pointer;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:flex-start;
+  z-index:5;
 }
 .knob{
-  width:44px;height:44px;background:#800;border:2px solid #0f0;
-  border-radius:50%;box-shadow:0 0 15px red;position:relative;top:-22px;
+  width:38px;
+  height:38px;
+  background:#800;
+  border:2px solid #0f0;
+  border-radius:50%;
+  box-shadow:0 0 15px red;
+  position:relative;
+  top:-20px;
   transition:transform 0.3s;
   animation:pulse 1.5s ease-in-out infinite alternate;
 }
 @keyframes pulse{from{box-shadow:0 0 10px red;}to{box-shadow:0 0 25px #f00;}}
-.knob.dragging{transform:translateY(200px);}
-#counter{margin-top:20px;text-align:center;font-size:1.1rem;color:#0f0;}
+.knob.dragging{transform:translateY(160px);}
+#counter{
+  margin-top:15px;
+  text-align:center;
+  font-size:clamp(1rem,3vw,1.2rem);
+  color:#0f0;
+}
+/* 📱 адаптация: центрирование и Telegram footer */
+#footer{
+  margin-top:25px;
+  text-align:center;
+  font-size:clamp(0.9rem,3vw,1rem);
+}
+#footer a{
+  color:#00ffaa;
+  text-decoration:none;
+  text-shadow:0 0 8px #00ffaa;
+  transition:0.2s;
+}
+#footer a:hover{color:#fff;text-shadow:0 0 15px #0f0;}
 </style>
 </head>
 <body>
 <h1>🪦 Open Source Resurrection Machine</h1>
 <div class="machine">
   <div id="msg">☠️ Pull the lever to see dead repositories</div>
-  <div class="lever" id="lever"><div class="knob" id="knob"></div></div>
+
+  <div class="lever" id="lever">
+    <div class="knob" id="knob"></div>
+  </div>
+
   <div class="reels">
     <div class="reel" id="r1">💀</div>
     <div class="reel" id="r2">💀</div>
@@ -93,12 +144,16 @@ h1{
 </div>
 <div id="counter"></div>
 
+<div id="footer">
+  👻 Follow the necromancer on <a href="https://t.me/dimasshortposts" target="_blank">Telegram</a>
+</div>
+
 <!-- звуки -->
 <audio id="spinSound" src="https://actions.google.com/sounds/v1/ambiences/steam_engine_idle.ogg" preload="auto" loop></audio>
 <audio id="stopSound" src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg" preload="auto"></audio>
 <audio id="dingSound" src="https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg" preload="auto"></audio>
-<!-- 💸 новый звук кассы -->
-<audio id="cashSound" src="https://actions.google.com/sounds/v1/cartoon/slide_whistle_to_drum_hit.ogg" preload="auto"></audio>
+<!-- 💸 новый звук кассы (совместимый mp3) -->
+<audio id="cashSound" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_25c4d9d739.mp3?filename=cash-register-02.mp3" preload="auto"></audio>
 
 <script>
 const reels=document.querySelectorAll(".reel");
@@ -128,7 +183,8 @@ function startSpin(){
   isSpinning=true;
   msg.innerText="⚙️ Spinning...";
   reels.forEach(r=>r.classList.add("spin"));
-  spinSound.volume=0.15; spinSound.play();
+  spinSound.volume=0.15;
+  spinSound.play().catch(()=>{});
 }
 
 function stopSpin(data){
@@ -136,19 +192,19 @@ function stopSpin(data){
   reels.forEach((r,i)=>{
     setTimeout(()=>{
       r.classList.remove("spin");
-      stopSound.currentTime=0; stopSound.volume=0.3; stopSound.play();
+      stopSound.currentTime=0; stopSound.volume=0.3; stopSound.play().catch(()=>{});
       const repo=data[i];
       if(!repo){r.innerHTML="💀 Empty tomb";return;}
       const year=new Date(repo.pushed_at).getFullYear();
       r.innerHTML=`<div style="text-align:center;pointer-events:none">
-        <strong>🪦 ${repo.name}</strong><br>⭐ ${repo.stargazers_count}<br>💀 ${year}
+        <strong>🪦 ${repo.name}</strong><br>⭐ ${repo.stargazers_count}<br>🕰 ${year}
       </div>`;
       r.onclick=()=>{
         window.open(repo.html_url,"_blank");
         souls++; localStorage.setItem("soulsRevived",souls);
         counter.innerText=`✨ Souls revived today: ${souls}`;
         msg.innerText="⭐ Light a star to bless one of them";
-        dingSound.play();
+        dingSound.play().catch(()=>{});
       };
       if(i===2){isSpinning=false;}
     },2200+i*600);
@@ -166,7 +222,7 @@ window.addEventListener("mousemove",e=>{
     triggered=true;
     cashSound.currentTime=0;
     cashSound.volume=0.4;
-    cashSound.play();
+    cashSound.play().catch(()=>{});
   }
 });
 window.addEventListener("mouseup",async e=>{
@@ -186,7 +242,7 @@ window.addEventListener("mouseup",async e=>{
   }
 });
 
-/* touch */
+/* Touch support */
 knob.addEventListener("touchstart",e=>{dragging=true;startY=e.touches[0].clientY;triggered=false;});
 window.addEventListener("touchmove",e=>{
   if(!dragging)return;
@@ -196,7 +252,7 @@ window.addEventListener("touchmove",e=>{
     triggered=true;
     cashSound.currentTime=0;
     cashSound.volume=0.4;
-    cashSound.play();
+    cashSound.play().catch(()=>{});
   }
 });
 window.addEventListener("touchend",async e=>{
