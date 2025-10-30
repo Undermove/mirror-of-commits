@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>🫞 Зеркало коммитов</title>
+<style>
+  body { background: radial-gradient(circle at center, #0b0b0b, #000); color: #e0e0e0; font-family: "Courier New", monospace; text-align: center; padding: 50px; }
+  #mirror { border: 2px solid #666; border-radius: 15px; padding: 30px; background: rgba(255, 255, 255, 0.05); box-shadow: 0 0 20px #333; max-width: 600px; margin: 50px auto; }
+  button { background: #111; color: #fff; border: 1px solid #666; border-radius: 5px; padding: 10px 20px; cursor: pointer; }
+  button:hover { background: #222; }
+</style>
+</head>
+<body>
+<h1>🎃 Зеркало коммитов</h1>
+<div id="mirror">Тёмное зеркало ждёт тебя...</div>
+<br />
+<button onclick="see()">Заглянуть</button>
+<script>
+async function see() {
+  const username = prompt("Введи свой GitHub username (например, dimaafonchenko)");
+  if (!username) return;
+  try {
+    const resp = await fetch(`https://api.github.com/users/${username}/events/public`);
+    const data = await resp.json();
+    const pushEvent = data.find(e => e.type === "PushEvent");
+    if (!pushEvent) {
+      document.getElementById("mirror").innerHTML = "У зеркала нет твоих коммитов... тишина...";
+      return;
+    }
+    const commits = pushEvent.payload.commits.slice(-3).reverse();
+    const time = new Date(pushEvent.created_at);
+    const hours = String(time.getHours()).padStart(2, '0');
+    const minutes = String(time.getMinutes()).padStart(2, '0');
+    const messages = commits.map(c => c.message);
+    let spookyText = `Ты коммитил в ${hours}:${minutes}...`;
+    spookyText += "<br>\u041Fоследние сообщения: <br>";
+    messages.forEach(m => { spookyText += `- \"${m}\"<br>`; });
+    const phrases = [
+      "Тень твоего кода оживает в полнолуние...",
+      "Призраки TODO шепчут тебе снова...",
+      "Тыквы смеются, когда тесты падают...",
+      "В темноте IDE что-то шуршит..."
+    ];
+    spookyText += "<br>" + phrases[Math.floor(Math.random() * phrases.length)];
+    document.getElementById("mirror").innerHTML = spookyText;
+  } catch (err) {
+    document.getElementById("mirror").innerHTML = "Зеркало треснуло... попробуй позже.";
+  }
+}
+</script>
+</body>
+</html>
