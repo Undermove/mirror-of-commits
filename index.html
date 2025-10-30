@@ -129,7 +129,7 @@ h1 {
   position:relative;
   width:16px;
   height: clamp(120px, 24vw, 170px);
-  background:#330033;
+  background: transparent;
   border:2px solid #ff70ff;
   border-radius:10px;
   cursor:pointer;
@@ -142,6 +142,16 @@ h1 {
   flex: 0 0 auto;
   margin-top: 12px;
 }
+.lever::before{
+  content:"";
+  position:absolute;
+  inset:0;
+  background:#330033;
+  border-radius:inherit;
+  transform-origin:center;
+  transform: scaleX(var(--shaftScale, 1));
+  transition: transform 0.06s linear;
+}
 .knob {
   width:32px;
   height:32px;
@@ -153,6 +163,8 @@ h1 {
   top:-18px;
   transition:transform 0.3s;
   animation:pulse 1.5s ease-in-out infinite alternate;
+  will-change: transform;
+  z-index:2;
 }
 @keyframes pulse {
   from{box-shadow:0 0 10px #f80;}
@@ -305,14 +317,19 @@ function handleStart(y){ dragging=true; startY=y; triggered=false; currentOffset
 function handleMove(y){
   if(!dragging) return;
   currentOffset=Math.min(Math.max(y-startY,0),120);
-  knob.style.transform=`translateY(${currentOffset}px)`;
+  const progress = currentOffset/120;
+  const knobScale = 1 + 0.50*progress; // up to +12% size
+  const shaftScale = 1 - 0.2*progress; // down to -20% width
+  knob.style.transform=`translateY(${currentOffset}px) scale(${knobScale.toFixed(3)})`;
+  lever.style.setProperty('--shaftScale', shaftScale.toFixed(3));
   if(currentOffset>90 && !triggered){
     triggered=true; cashSound.currentTime=0; cashSound.volume=0.4; cashSound.play().catch(()=>{});
   }
 }
 async function handleEnd(){
   if(!dragging) return; dragging=false;
-  knob.style.transform='translateY(0px)';
+  knob.style.transform='translateY(0px) scale(1)';
+  lever.style.setProperty('--shaftScale', '1');
   if(currentOffset>90){
     startSpin();
     try{
