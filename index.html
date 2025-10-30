@@ -316,28 +316,18 @@ const cashSound=document.getElementById("cashSound");
 const leverSound=document.getElementById("leverSound");
 const muteToggle=document.getElementById("muteToggle");
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-// Global counter via CountAPI
-const COUNTAPI_NS = 'open-source-resurrection-machine';
-const COUNTAPI_KEY = 'souls_revived';
+// Fake global counter: number of 5s intervals since 2025-10-31 00:00:00 (local)
 function setCounterText(v){ counter.innerText = `✨ Souls revived: ${v}`; }
-async function fetchSouls(){
-  try{
-    const r = await fetch(`https://api.countapi.xyz/get/${COUNTAPI_NS}/${COUNTAPI_KEY}`);
-    if(r.ok){ const j = await r.json(); return Number(j.value||0); }
-    // create counter if missing
-    await fetch(`https://api.countapi.xyz/create?namespace=${COUNTAPI_NS}&key=${COUNTAPI_KEY}&value=0`);
-    return 0;
-  }catch(_){ return 0; }
-}
-async function hitSouls(){
-  try{
-    const r = await fetch(`https://api.countapi.xyz/hit/${COUNTAPI_NS}/${COUNTAPI_KEY}`);
-    const j = await r.json();
-    return Number(j.value||0);
-  }catch(_){ return souls+1; }
-}
-let souls=0;
-fetchSouls().then(v=>{ souls=v; setCounterText(souls); });
+const START_MS = new Date(2025, 9, 31, 0, 0, 0, 0).getTime(); // Oct=9
+function computeSouls(){ const diff=Math.max(0, Date.now()-START_MS); return Math.floor(diff/5000); }
+let souls = computeSouls();
+setCounterText(souls);
+(function schedule(){
+  const now=Date.now();
+  const offset=(now-START_MS)%5000;
+  const next=5000-offset;
+  setTimeout(function tick(){ souls=computeSouls(); setCounterText(souls); setTimeout(tick,5000); }, next);
+})();
 let isSpinning=false,triggered=false,currentOffset=0,startY=0,dragging=false;
 
 // Mute handling
@@ -417,10 +407,8 @@ function stopSpin(data){
           <div class="meta">⭐ ${repo.stargazers_count}</div>
           <div class="meta" title="Year of last commit">💀 ${year}</div>
         </div>`;
-        r.onclick=async ()=>{
+        r.onclick=()=>{
           window.open(repo.html_url,"_blank");
-          souls = await hitSouls();
-          setCounterText(souls);
           msg.innerText="⭐ Light a star to bless one of them";
           dingSound.play().catch(()=>{});
         };
