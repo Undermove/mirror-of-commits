@@ -31,7 +31,8 @@ h1{
   border-radius:25px;
   box-shadow:0 0 40px #0f0 inset,0 0 60px #040;
   padding:20px;
-  overflow:hidden;
+  /* ✅ теперь рычаг не обрезается */
+  overflow:visible;
 }
 .reels{
   display:flex;
@@ -75,10 +76,10 @@ h1{
   from{transform:translateY(0px);}
   to{transform:translateY(6px);}
 }
-/* lever with rod + knob */
+/* ✅ lever with rod + knob now visible */
 .lever{
   position:absolute;
-  right:-60px;
+  right:-30px;   /* немного ближе к корпусу */
   top:20px;
   width:20px;
   height:280px;
@@ -90,6 +91,7 @@ h1{
   flex-direction:column;
   align-items:center;
   justify-content:flex-start;
+  z-index:5;
 }
 .knob{
   width:44px;
@@ -116,6 +118,7 @@ h1{
 <div class="machine">
   <div id="msg">☠️ Pull the lever to see dead repositories</div>
 
+  <!-- ✅ видимый рычаг -->
   <div class="lever" id="lever">
     <div class="knob" id="knob"></div>
   </div>
@@ -188,6 +191,7 @@ function stopSpin(data){
   });
 }
 
+/* drag mechanics */
 let dragging=false,startY=0;
 knob.addEventListener("mousedown",e=>{dragging=true;startY=e.clientY;});
 window.addEventListener("mousemove",e=>{
@@ -212,6 +216,7 @@ window.addEventListener("mouseup",async e=>{
   }
 });
 
+/* mobile */
 knob.addEventListener("touchstart",e=>{dragging=true;startY=e.touches[0].clientY;});
 window.addEventListener("touchmove",e=>{
   if(!dragging)return;
