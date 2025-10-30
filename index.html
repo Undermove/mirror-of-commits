@@ -75,13 +75,13 @@ h1{
   from{transform:translateY(0px);}
   to{transform:translateY(6px);}
 }
-/* lever */
+/* lever with rod + knob */
 .lever{
   position:absolute;
-  right:-50px;
-  top:30px;
+  right:-60px;
+  top:20px;
   width:20px;
-  height:240px;
+  height:280px;
   background:#333;
   border:2px solid #0f0;
   border-radius:10px;
@@ -92,17 +92,17 @@ h1{
   justify-content:flex-start;
 }
 .knob{
-  width:40px;
-  height:40px;
+  width:44px;
+  height:44px;
   background:#800;
   border:2px solid #0f0;
   border-radius:50%;
   box-shadow:0 0 15px red;
   position:relative;
-  top:-20px;
+  top:-22px;
   transition:transform 0.3s;
 }
-.knob.dragging{transform:translateY(160px);}
+.knob.dragging{transform:translateY(200px);}
 #counter{
   margin-top:20px;
   text-align:center;
@@ -115,9 +115,11 @@ h1{
 <h1>🪦 Open Source Resurrection Machine</h1>
 <div class="machine">
   <div id="msg">☠️ Pull the lever to see dead repositories</div>
+
   <div class="lever" id="lever">
     <div class="knob" id="knob"></div>
   </div>
+
   <div class="reels">
     <div class="reel" id="r1">💀</div>
     <div class="reel" id="r2">💀</div>
@@ -190,7 +192,7 @@ let dragging=false,startY=0;
 knob.addEventListener("mousedown",e=>{dragging=true;startY=e.clientY;});
 window.addEventListener("mousemove",e=>{
   if(!dragging)return;
-  let offset=Math.min(Math.max(e.clientY-startY,0),160);
+  let offset=Math.min(Math.max(e.clientY-startY,0),200);
   knob.style.transform=`translateY(${offset}px)`;
 });
 window.addEventListener("mouseup",async e=>{
@@ -213,7 +215,7 @@ window.addEventListener("mouseup",async e=>{
 knob.addEventListener("touchstart",e=>{dragging=true;startY=e.touches[0].clientY;});
 window.addEventListener("touchmove",e=>{
   if(!dragging)return;
-  let offset=Math.min(Math.max(e.touches[0].clientY-startY,0),160);
+  let offset=Math.min(Math.max(e.touches[0].clientY-startY,0),200);
   knob.style.transform=`translateY(${offset}px)`;
 });
 window.addEventListener("touchend",async e=>{
