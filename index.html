@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>🎃 Open Source Resurrection Machine</title>
 <style>
 body {
@@ -10,12 +10,15 @@ body {
   background: radial-gradient(circle at center, #1a001a 0%, #000010 100%);
   color:#9effd1;
   font-family:"Courier New",monospace;
-  height:100vh;
+  min-height:100dvh;
   display:flex;
   flex-direction:column;
   align-items:center;
-  justify-content:center;
-  overflow:hidden;
+  justify-content:flex-start;
+  padding: clamp(12px, 4vh, 24px);
+  gap: 12px;
+  /* Avoid horizontal scroll from glows/lever on mobile */
+  overflow-x: clip;
   opacity:0;
   animation:fadeIn 2s forwards;
 }
@@ -29,8 +32,8 @@ h1 {
 }
 .machine {
   position:relative;
-  width:min(90vw,420px);
-  height:330px;
+  width:clamp(280px, 92vw, 560px);
+  min-height: clamp(260px, 60vw, 360px);
   background:#150015;
   border:2px solid #ff6eff;
   border-radius:20px;
@@ -39,17 +42,17 @@ h1 {
   flex-direction:column;
   justify-content:flex-start;
   align-items:center;
-  padding:18px;
+  padding: clamp(14px, 3.5vw, 20px);
   overflow:visible;
 }
 .machine::before {
   content:"";
   position:absolute;
-  top:-60%;
+  top:-50%;
   left:50%;
   transform:translateX(-50%);
-  width:400px;
-  height:400px;
+  width:min(140%, 520px);
+  height:min(140%, 520px);
   background:radial-gradient(circle,rgba(255,200,100,0.15) 0%,transparent 70%);
   z-index:-2;
 }
@@ -82,16 +85,15 @@ h1 {
 }
 @keyframes floatText {from{transform:translateY(0);}to{transform:translateY(6px);}}
 .reels {
-  display:flex;
-  justify-content:center;
+  display:grid;
+  grid-template-columns: repeat(3, 1fr);
   gap:10px;
   perspective:900px;
   margin-top:15px;
+  width:100%;
 }
 .reel {
-  flex:1;
-  width:28%;
-  height:120px;
+  min-height: clamp(96px, 22vw, 130px);
   background:#050008;
   border:2px solid #00ffaa;
   border-radius:10px;
@@ -103,20 +105,30 @@ h1 {
   box-shadow:inset 0 0 15px #000;
   transform-style:preserve-3d;
   cursor:pointer;
-  padding:4px;
+  padding:6px;
   text-align:center;
   overflow:hidden;
   text-overflow:ellipsis;
   white-space:nowrap;
 }
+.reel:focus-visible { outline:2px dashed #ff70ff; outline-offset:2px; }
+.reel .card{ width:100%; display:grid; grid-template-rows:auto auto auto; row-gap:4px; }
+.reel .name{
+  display:block;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  overflow-wrap:anywhere;
+}
+.reel .meta{ opacity:0.9; }
 .reel.spin {animation:spin 0.45s linear infinite;}
 @keyframes spin {from{transform:rotateX(0deg);}to{transform:rotateX(-360deg);}}
 .lever {
   position:absolute;
-  right:-18px;
+  right:6px;
   top:12px;
-  width:14px;
-  height:160px;
+  width:16px;
+  height: clamp(120px, 24vw, 170px);
   background:#330033;
   border:2px solid #ff70ff;
   border-radius:10px;
@@ -126,6 +138,7 @@ h1 {
   align-items:center;
   justify-content:flex-start;
   z-index:5;
+  appearance: none;
 }
 .knob {
   width:32px;
@@ -167,21 +180,41 @@ h1 {
   color:#fff;
   text-shadow:0 0 15px #fff;
 }
+
+/* Larger screens tweaks */
+@media (min-width: 640px){
+  .machine { min-height: 330px; }
+  .reel { min-height: 120px; }
+}
+
+/* Reduce animations for users who prefer less motion */
+@media (prefers-reduced-motion: reduce){
+  #msg{ animation: none; }
+  .machine::after{ animation: none; }
+  .knob{ animation: none; }
+  .reel.spin{ animation: none; }
+}
 </style>
 </head>
 <body>
-<h1>🎃 Open Source Resurrection Machine</h1>
-<div class="machine">
-  <div id="msg">☠️ Pull the lever to see dead repositories</div>
-  <div class="lever" id="lever"><div class="knob" id="knob"></div></div>
-  <div class="reels">
-    <div class="reel" id="r1">💀</div>
-    <div class="reel" id="r2">💀</div>
-    <div class="reel" id="r3">💀</div>
-  </div>
-</div>
-<div id="counter"></div>
-<div id="footer">🕯️ Follow the necromancer on <a href="https://t.me/dimasshortposts" target="_blank">Telegram</a></div>
+  <header>
+    <h1>🎃 Open Source Resurrection Machine</h1>
+  </header>
+  <main id="content">
+    <section class="machine" aria-label="Slot machine">
+      <p id="msg">☠️ Pull the lever to see dead repositories</p>
+      <button class="lever" id="lever" type="button" aria-label="Pull the lever">
+        <span class="knob" id="knob" aria-hidden="true"></span>
+      </button>
+      <div class="reels" role="list" aria-live="polite" aria-atomic="true">
+        <div class="reel" id="r1" role="listitem" tabindex="0">💀</div>
+        <div class="reel" id="r2" role="listitem" tabindex="0">💀</div>
+        <div class="reel" id="r3" role="listitem" tabindex="0">💀</div>
+      </div>
+    </section>
+    <p id="counter" aria-live="polite"></p>
+  </main>
+  <footer id="footer">🕯️ Follow the necromancer on <a href="https://t.me/dimasshortposts" target="_blank" rel="noopener noreferrer">Telegram</a></footer>
 
 <!-- sounds -->
 <audio id="spinSound" src="https://actions.google.com/sounds/v1/ambiences/steam_engine_idle.ogg" preload="auto" loop></audio>
@@ -192,15 +225,17 @@ h1 {
 <script>
 const reels=document.querySelectorAll(".reel");
 const knob=document.getElementById("knob");
+const lever=document.getElementById("lever");
 const msg=document.getElementById("msg");
 const counter=document.getElementById("counter");
 const spinSound=document.getElementById("spinSound");
 const stopSound=document.getElementById("stopSound");
 const dingSound=document.getElementById("dingSound");
 const cashSound=document.getElementById("cashSound");
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 let souls=Number(localStorage.getItem("soulsRevived")||0);
 counter.innerText=`✨ Souls revived today: ${souls}`;
-let isSpinning=false,triggered=false;
+let isSpinning=false,triggered=false,currentOffset=0,startY=0,dragging=false;
 
 async function getRepos(){
   const page=Math.floor(Math.random()*30)+1;
@@ -213,7 +248,7 @@ function startSpin(){
   if(isSpinning)return;
   isSpinning=true;
   msg.innerText="⚙️ Spinning...";
-  reels.forEach(r=>r.classList.add("spin"));
+  if(!reduceMotion){ reels.forEach(r=>r.classList.add("spin")); }
   spinSound.volume=0.12;
   spinSound.play().catch(()=>{});
 }
@@ -226,10 +261,12 @@ function stopSpin(data){
       stopSound.volume=0.25;
       stopSound.play().catch(()=>{});
       const repo=data[i];
-      if(!repo){r.innerHTML="💀 Empty tomb";return;}
+      if(!repo){ r.innerHTML="💀 Empty tomb"; return; }
       const year=new Date(repo.pushed_at).getFullYear();
-      r.innerHTML=`<div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
-        <strong>🪦 ${repo.name}</strong><br>⭐ ${repo.stargazers_count}<br>🕰 ${year}
+      r.innerHTML=`<div class="card">
+        <strong class="name">🪦 ${repo.name}</strong>
+        <div class="meta">⭐ ${repo.stargazers_count}</div>
+        <div class="meta">🕰 ${year}</div>
       </div>`;
       r.onclick=()=>{
         window.open(repo.html_url,"_blank");
@@ -239,26 +276,26 @@ function stopSpin(data){
         msg.innerText="⭐ Light a star to bless one of them";
         dingSound.play().catch(()=>{});
       };
+      r.setAttribute('aria-label', `${repo.full_name||repo.name} — ${repo.stargazers_count} stars, last update ${year}`);
       if(i===2)isSpinning=false;
     },2000+i*500);
   });
 }
-let dragging=false,startY=0;
-knob.addEventListener("mousedown",e=>{dragging=true;startY=e.clientY;triggered=false;});
-window.addEventListener("mousemove",e=>{
-  if(!dragging)return;
-  let offset=Math.min(Math.max(e.clientY-startY,0),120);
-  knob.style.transform=`translateY(${offset}px)`;
-  if(offset>90&&!triggered){
-    triggered=true;
-    cashSound.currentTime=0;cashSound.volume=0.4;cashSound.play().catch(()=>{});
+
+// Dragging logic (mouse + touch) with threshold
+function handleStart(y){ dragging=true; startY=y; triggered=false; currentOffset=0; }
+function handleMove(y){
+  if(!dragging) return;
+  currentOffset=Math.min(Math.max(y-startY,0),120);
+  knob.style.transform=`translateY(${currentOffset}px)`;
+  if(currentOffset>90 && !triggered){
+    triggered=true; cashSound.currentTime=0; cashSound.volume=0.4; cashSound.play().catch(()=>{});
   }
-});
-window.addEventListener("mouseup",async()=>{
-  if(!dragging)return;dragging=false;
-  const offset=parseInt(knob.style.transform.replace(/\D/g,''))||0;
+}
+async function handleEnd(){
+  if(!dragging) return; dragging=false;
   knob.style.transform='translateY(0px)';
-  if(offset>90){
+  if(currentOffset>90){
     startSpin();
     try{
       const data=await getRepos();
@@ -269,20 +306,21 @@ window.addEventListener("mouseup",async()=>{
       isSpinning=false;
     }
   }
-});
-knob.addEventListener("touchstart",e=>{dragging=true;startY=e.touches[0].clientY;triggered=false;});
-window.addEventListener("touchmove",e=>{
-  if(!dragging)return;
-  let offset=Math.min(Math.max(e.touches[0].clientY-startY,0),120);
-  knob.style.transform=`translateY(${offset}px)`;
-  if(offset>90&&!triggered){
-    triggered=true;
-    cashSound.currentTime=0;cashSound.volume=0.4;cashSound.play().catch(()=>{});
-  }
-});
-window.addEventListener("touchend",async()=>{
-  if(!dragging)return;dragging=false;
-  knob.style.transform='translateY(0px)';
+}
+
+// Mouse
+knob.addEventListener('mousedown', e=>{ handleStart(e.clientY); });
+window.addEventListener('mousemove', e=>{ handleMove(e.clientY); });
+window.addEventListener('mouseup', ()=>{ handleEnd(); });
+
+// Touch
+knob.addEventListener('touchstart', e=>{ handleStart(e.touches[0].clientY); }, {passive:true});
+window.addEventListener('touchmove', e=>{ handleMove(e.touches[0].clientY); }, {passive:true});
+window.addEventListener('touchend', ()=>{ handleEnd(); });
+
+// Click lever (keyboard/assistive)
+lever.addEventListener('click', async ()=>{
+  if(isSpinning) return;
   startSpin();
   try{
     const data=await getRepos();
@@ -291,6 +329,13 @@ window.addEventListener("touchend",async()=>{
     msg.innerText="⚠️ Spirits refused to answer.";
     reels.forEach(r=>r.classList.remove("spin"));
     isSpinning=false;
+  }
+});
+
+// Keyboard activate reels
+document.querySelector('.reels').addEventListener('keydown', e=>{
+  if((e.key==='Enter' || e.key===' ') && e.target.classList.contains('reel')){
+    e.preventDefault(); e.target.click();
   }
 });
 </script>
