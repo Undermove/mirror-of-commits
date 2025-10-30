@@ -153,7 +153,7 @@ h1 {
   transform-origin:center;
   transform: scaleX(var(--shaftScale, 1));
   clip-path: inset(var(--shaftTop, 0px) 0 0 0);
-  transition: transform 0.06s linear, clip-path 0.06s linear;
+  transition: transform 0.3s ease, clip-path 0.3s ease;
 }
 .lever.dragging::before{ transition: none; }
 .knob {
@@ -177,24 +177,6 @@ h1 {
   margin-top:10px;
   text-align:center;
   font-size: clamp(0.9rem,3vw,1.1rem);
-  color:#ffb4ff;
-  text-shadow:0 0 10px #ff70ff;
-}
-#footer {
-  margin-top:10px;
-  text-align:center;
-{{ ... }}
-  font-size:clamp(0.8rem,3vw,1rem);
-  color:#ffb4ff;
-}
-#footer a {
-  color:#ffaaff;
-  text-decoration:none;
-  text-shadow:0 0 8px #ff66ff;
-  transition:0.2s;
-}
-#footer a:hover {
-  color:#fff;
   text-shadow:0 0 15px #fff;
 }
 
