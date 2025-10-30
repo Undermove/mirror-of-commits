@@ -12,7 +12,7 @@ A spooky slot machine that resurfaces once-great, now-dormant open source reposi
 
 If the embedded preview does not render on GitHub (iframes are often sanitized), use the direct link below.
 
-- Live preview: https://htmlpreview.github.io/?https://github.com/Undermove/open-source-resurrection-machine/blob/main/index.html
+- Live preview: [here](https://htmlpreview.github.io/?https://github.com/Undermove/open-source-resurrection-machine/blob/main/index.html)
 
 ## Run locally
 
