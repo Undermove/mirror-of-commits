@@ -150,7 +150,8 @@ h1 {
   border-radius:inherit;
   transform-origin:center;
   transform: scaleX(var(--shaftScale, 1));
-  transition: transform 0.06s linear;
+  clip-path: inset(var(--shaftTop, 0px) 0 0 0);
+  transition: transform 0.06s linear, clip-path 0.06s linear;
 }
 .knob {
   width:32px;
@@ -318,10 +319,11 @@ function handleMove(y){
   if(!dragging) return;
   currentOffset=Math.min(Math.max(y-startY,0),120);
   const progress = currentOffset/120;
-  const knobScale = 1 + 0.50*progress; // up to +12% size
+  const knobScale = 1 + 0.50*progress; // up to +50% size
   const shaftScale = 1 - 0.2*progress; // down to -20% width
   knob.style.transform=`translateY(${currentOffset}px) scale(${knobScale.toFixed(3)})`;
   lever.style.setProperty('--shaftScale', shaftScale.toFixed(3));
+  lever.style.setProperty('--shaftTop', `${Math.round(currentOffset)}px`);
   if(currentOffset>90 && !triggered){
     triggered=true; cashSound.currentTime=0; cashSound.volume=0.4; cashSound.play().catch(()=>{});
   }
@@ -330,6 +332,7 @@ async function handleEnd(){
   if(!dragging) return; dragging=false;
   knob.style.transform='translateY(0px) scale(1)';
   lever.style.setProperty('--shaftScale', '1');
+  lever.style.setProperty('--shaftTop', '0px');
   if(currentOffset>90){
     startSpin();
     try{
