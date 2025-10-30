@@ -293,7 +293,7 @@ footer#footer {
     </div>
     <p id="counter" aria-live="polite"></p>
   </main>
-  <footer id="footer">🕯️ Follow the necromancer on <a href="https://t.me/dimasshortposts" target="_blank" rel="noopener noreferrer">Telegram</a></footer>
+  <footer id="footer">⭐ If you enjoy this project, please star the repository or follow me on <a href="https://t.me/dimasshortposts" target="_blank" rel="noopener noreferrer">Telegram</a></footer>
 
 <!-- sounds -->
 <audio id="spinSound" src="https://orangefreesounds.com/wp-content/uploads/2024/12/Slot-machine-sound-effect.mp3" preload="auto" loop></audio>
@@ -316,8 +316,28 @@ const cashSound=document.getElementById("cashSound");
 const leverSound=document.getElementById("leverSound");
 const muteToggle=document.getElementById("muteToggle");
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-let souls=Number(localStorage.getItem("soulsRevived")||0);
-counter.innerText=`✨ Souls revived today: ${souls}`;
+// Global counter via CountAPI
+const COUNTAPI_NS = 'open-source-resurrection-machine';
+const COUNTAPI_KEY = 'souls_revived';
+function setCounterText(v){ counter.innerText = `✨ Souls revived: ${v}`; }
+async function fetchSouls(){
+  try{
+    const r = await fetch(`https://api.countapi.xyz/get/${COUNTAPI_NS}/${COUNTAPI_KEY}`);
+    if(r.ok){ const j = await r.json(); return Number(j.value||0); }
+    // create counter if missing
+    await fetch(`https://api.countapi.xyz/create?namespace=${COUNTAPI_NS}&key=${COUNTAPI_KEY}&value=0`);
+    return 0;
+  }catch(_){ return 0; }
+}
+async function hitSouls(){
+  try{
+    const r = await fetch(`https://api.countapi.xyz/hit/${COUNTAPI_NS}/${COUNTAPI_KEY}`);
+    const j = await r.json();
+    return Number(j.value||0);
+  }catch(_){ return souls+1; }
+}
+let souls=0;
+fetchSouls().then(v=>{ souls=v; setCounterText(souls); });
 let isSpinning=false,triggered=false,currentOffset=0,startY=0,dragging=false;
 
 // Mute handling
@@ -397,11 +417,10 @@ function stopSpin(data){
           <div class="meta">⭐ ${repo.stargazers_count}</div>
           <div class="meta">💀 ${year}</div>
         </div>`;
-        r.onclick=()=>{
+        r.onclick=async ()=>{
           window.open(repo.html_url,"_blank");
-          souls++;
-          localStorage.setItem("soulsRevived",souls);
-          counter.innerText=`✨ Souls revived today: ${souls}`;
+          souls = await hitSouls();
+          setCounterText(souls);
           msg.innerText="⭐ Light a star to bless one of them";
           dingSound.play().catch(()=>{});
         };
