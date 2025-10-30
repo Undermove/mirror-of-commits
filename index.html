@@ -6,76 +6,120 @@
 <title>🪦 Open Source Resurrection Machine</title>
 <style>
 body {
-  background: radial-gradient(circle at center, #0b0b0b, #000);
+  background: radial-gradient(circle at center, #050505, #000);
   color: #eee;
-  font-family: 'Courier New', monospace;
+  font-family: "Courier New", monospace;
   text-align: center;
-  padding: 40px;
+  overflow: hidden;
 }
-h1 { color: #00ff99; text-shadow: 0 0 10px #00ff99; }
+h1 {
+  color: #00ff99;
+  text-shadow: 0 0 10px #00ff99;
+  margin-top: 30px;
+}
+#slots {
+  display: flex;
+  justify-content: center;
+  gap: 25px;
+  margin-top: 40px;
+}
+.slot {
+  width: 240px;
+  height: 160px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid #222;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  box-shadow: 0 0 15px #0f0;
+  transition: transform 0.8s ease-out;
+  transform-style: preserve-3d;
+}
+.slot.spin {
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  0% { transform: rotateY(0deg); }
+  100% { transform: rotateY(360deg); }
+}
 button {
   background: #111;
   color: #00ff99;
   border: 1px solid #00ff99;
   padding: 10px 25px;
-  font-size: 1.1rem;
+  font-size: 1.2rem;
   cursor: pointer;
-  margin-top: 20px;
+  margin-top: 25px;
   transition: 0.2s;
 }
 button:hover { background: #00ff99; color: #000; }
-#slots {
-  display: flex; justify-content: center;
-  gap: 20px; margin-top: 30px;
+a {
+  color: #00ffaa;
+  text-decoration: none;
 }
-.slot {
-  width: 240px; height: 160px;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid #333;
-  border-radius: 12px;
-  padding: 15px;
-  box-shadow: 0 0 10px #111;
-}
-a { color: #00ffaa; text-decoration: none; }
 a:hover { text-decoration: underline; }
-#msg { margin-top: 30px; opacity: 0.7; }
+#msg { margin-top: 25px; opacity: 0.8; }
+#counter { margin-top: 10px; color: #00ffaa; font-size: 1.1rem; }
 </style>
 </head>
 <body>
-<h1>🪦 The Open Source Resurrection Machine</h1>
-<p>Find forgotten projects... and give them a star ⭐</p>
+<h1>🪦 Open Source Resurrection Machine</h1>
+<p>Spin to find legendary repos lost in time... and give them a star ⭐</p>
+
 <div id="slots">
-  <div class="slot">🕳</div>
-  <div class="slot">🕳</div>
-  <div class="slot">🕳</div>
+  <div class="slot">💀</div>
+  <div class="slot">💀</div>
+  <div class="slot">💀</div>
 </div>
+
 <button id="spin">🎰 SPIN</button>
 <div id="msg"></div>
+<div id="counter"></div>
 
 <script>
+const msg = document.getElementById("msg");
+const counter = document.getElementById("counter");
+const slots = document.querySelectorAll(".slot");
+
+let souls = Number(localStorage.getItem("soulsRevived") || 0);
+counter.innerText = `✨ Souls revived today: ${souls}`;
+
 async function spin() {
-  document.getElementById("msg").innerText = "Summoning old souls...";
-  const page = Math.floor(Math.random() * 20) + 1;
-  const url = `https://api.github.com/search/repositories?q=stars:<10+pushed:<2020-01-01&sort=updated&order=asc&per_page=3&page=${page}`;
+  msg.innerText = "Summoning forgotten legends...";
+  slots.forEach(s => { s.classList.add("spin"); s.innerText = "💀"; });
+
+  const page = Math.floor(Math.random() * 30) + 1;
+  const url = `https://api.github.com/search/repositories?q=stars:>1000+pushed:<2021-01-01+archived:false&sort=stars&order=desc&per_page=3&page=${page}`;
+
   try {
     const resp = await fetch(url);
     const data = await resp.json();
-    const slots = document.querySelectorAll('.slot');
-    slots.forEach((slot, i) => {
-      const repo = data.items[i];
-      if (!repo) { slot.innerHTML = "💀 empty tomb"; return; }
-      const pushed = new Date(repo.pushed_at).getFullYear();
-      slot.innerHTML = `
+    await new Promise(r => setTimeout(r, 2000)); // imitate spin time
+    slots.forEach(s => s.classList.remove("spin"));
+
+    data.items.forEach((repo, i) => {
+      const year = new Date(repo.pushed_at).getFullYear();
+      slots[i].innerHTML = `
         <h3>🪦 ${repo.name}</h3>
-        <p>Last commit: ${pushed}</p>
-        <p><a href="${repo.html_url}" target="_blank">Open repo ↗</a></p>
+        <p>${repo.stargazers_count} ⭐ · last commit: ${year}</p>
+        <p><a href="${repo.html_url}" target="_blank">Bless this repo ↗</a></p>
       `;
+      const link = slots[i].querySelector("a");
+      link.addEventListener("click", () => {
+        souls++;
+        localStorage.setItem("soulsRevived", souls);
+        counter.innerText = `✨ Souls revived today: ${souls}`;
+        msg.innerText = "💫 A lost repo feels warmth again...";
+      });
     });
-    document.getElementById("msg").innerText = "✨ Bless one... make a coder smile.";
   } catch (e) {
-    document.getElementById("msg").innerText = "⚠️ Spirits refused to answer.";
+    msg.innerText = "⚠️ Spirits refused to answer.";
+    slots.forEach(s => s.classList.remove("spin"));
   }
 }
+
 document.getElementById("spin").onclick = spin;
 </script>
 </body>
