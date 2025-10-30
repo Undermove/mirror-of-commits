@@ -188,6 +188,7 @@ h1 {
   align-items:flex-start;
   justify-content:center;
   gap: clamp(10px, 2.5vw, 18px);
+  margin-top: clamp(10px, 2.5vw, 22px);
 }
 
 /* Filters */
@@ -195,7 +196,7 @@ h1 {
   display:flex;
   align-items:center;
   gap:8px;
-  margin-top:6px;
+  margin-top: clamp(10px, 2vw, 16px);
   color:#ffb4ff;
 }
 .filters label{ font-size: 0.9rem; opacity:0.95; }
@@ -225,6 +226,11 @@ h1 {
   .knob{ animation: none; }
   .reel.spin{ animation: none; }
 }
+
+/* Footer spacing */
+footer#footer {
+  margin-top: clamp(12px, 3vw, 24px);
+}
 </style>
 </head>
 <body>
@@ -235,6 +241,11 @@ h1 {
     <div class="machine-row">
       <section class="machine" aria-label="Slot machine">
         <p id="msg">☠️ Pull the lever to see dead repositories -></p>
+        <div class="reels" role="list" aria-live="polite" aria-atomic="true">
+          <div class="reel" id="r1" role="listitem" tabindex="0">💀</div>
+          <div class="reel" id="r2" role="listitem" tabindex="0">💀</div>
+          <div class="reel" id="r3" role="listitem" tabindex="0">💀</div>
+        </div>
         <div class="filters" aria-label="Filters">
           <label for="langFilter">Language:</label>
           <select id="langFilter" name="langFilter">
@@ -258,11 +269,6 @@ h1 {
             <option value="Lua">Lua</option>
             <option value="Shell">Shell</option>
           </select>
-        </div>
-        <div class="reels" role="list" aria-live="polite" aria-atomic="true">
-          <div class="reel" id="r1" role="listitem" tabindex="0">💀</div>
-          <div class="reel" id="r2" role="listitem" tabindex="0">💀</div>
-          <div class="reel" id="r3" role="listitem" tabindex="0">💀</div>
         </div>
       </section>
       <button class="lever" id="lever" type="button" aria-label="Pull the lever">
@@ -361,7 +367,10 @@ function stopSpin(data){
         dingSound.play().catch(()=>{});
       };
       r.setAttribute('aria-label', `${repo.full_name||repo.name} — ${repo.stargazers_count} stars, last update ${year}`);
-      if(i===2)isSpinning=false;
+      if(i===2){
+        isSpinning=false;
+        msg.innerText="⭐ Light a star to bless one of them";
+      }
     },2000+i*500);
   });
 }
