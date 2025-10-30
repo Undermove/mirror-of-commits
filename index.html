@@ -15,7 +15,7 @@ body {
   flex-direction:column;
   align-items:center;
   justify-content:flex-start;
-  padding: clamp(12px, 4vh, 24px);
+  padding: clamp(16px, 5vw, 28px);
   gap: 12px;
   /* Avoid horizontal scroll from glows/lever on mobile */
   overflow-x: clip;
@@ -32,7 +32,8 @@ h1 {
 }
 .machine {
   position:relative;
-  width:clamp(280px, 92vw, 560px);
+  width:100%;
+  max-width:560px;
   min-height: clamp(260px, 60vw, 360px);
   background:#150015;
   border:2px solid #ff6eff;
@@ -44,6 +45,7 @@ h1 {
   align-items:center;
   padding: clamp(14px, 3.5vw, 20px);
   overflow:visible;
+  flex:1 1 auto;
 }
 .machine::before {
   content:"";
@@ -124,9 +126,7 @@ h1 {
 .reel.spin {animation:spin 0.45s linear infinite;}
 @keyframes spin {from{transform:rotateX(0deg);}to{transform:rotateX(-360deg);}}
 .lever {
-  position:absolute;
-  right:6px;
-  top:12px;
+  position:relative;
   width:16px;
   height: clamp(120px, 24vw, 170px);
   background:#330033;
@@ -137,8 +137,10 @@ h1 {
   flex-direction:column;
   align-items:center;
   justify-content:flex-start;
-  z-index:5;
+  z-index:1;
   appearance: none;
+  flex: 0 0 auto;
+  margin-top: 12px;
 }
 .knob {
   width:32px;
@@ -181,6 +183,16 @@ h1 {
   text-shadow:0 0 15px #fff;
 }
 
+/* Row wrapper to keep lever on the right with spacing */
+.machine-row {
+  width:100%;
+  max-width: 640px;
+  display:flex;
+  align-items:flex-start;
+  justify-content:center;
+  gap: clamp(10px, 2.5vw, 18px);
+}
+
 /* Larger screens tweaks */
 @media (min-width: 640px){
   .machine { min-height: 330px; }
@@ -201,17 +213,19 @@ h1 {
     <h1>🎃 Open Source Resurrection Machine</h1>
   </header>
   <main id="content">
-    <section class="machine" aria-label="Slot machine">
-      <p id="msg">☠️ Pull the lever to see dead repositories</p>
+    <div class="machine-row">
+      <section class="machine" aria-label="Slot machine">
+        <p id="msg">☠️ Pull the lever to see dead repositories -></p>
+        <div class="reels" role="list" aria-live="polite" aria-atomic="true">
+          <div class="reel" id="r1" role="listitem" tabindex="0">💀</div>
+          <div class="reel" id="r2" role="listitem" tabindex="0">💀</div>
+          <div class="reel" id="r3" role="listitem" tabindex="0">💀</div>
+        </div>
+      </section>
       <button class="lever" id="lever" type="button" aria-label="Pull the lever">
         <span class="knob" id="knob" aria-hidden="true"></span>
       </button>
-      <div class="reels" role="list" aria-live="polite" aria-atomic="true">
-        <div class="reel" id="r1" role="listitem" tabindex="0">💀</div>
-        <div class="reel" id="r2" role="listitem" tabindex="0">💀</div>
-        <div class="reel" id="r3" role="listitem" tabindex="0">💀</div>
-      </div>
-    </section>
+    </div>
     <p id="counter" aria-live="polite"></p>
   </main>
   <footer id="footer">🕯️ Follow the necromancer on <a href="https://t.me/dimasshortposts" target="_blank" rel="noopener noreferrer">Telegram</a></footer>
