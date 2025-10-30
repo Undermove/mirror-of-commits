@@ -16,7 +16,7 @@ body{
   justify-content:flex-start;
   min-height:100vh;
   overflow:hidden;
-  padding:20px 0;
+  padding:10px 0 20px 0;
   opacity:0;
   animation:fadeIn 2s forwards;
 }
@@ -24,22 +24,20 @@ body{
 h1{
   color:#00ff9d;
   text-shadow:0 0 10px #00ff9d;
-  margin:10px 0 5px 0;
+  margin:10px 0;
   text-align:center;
-  font-size:clamp(1.2rem,5vw,1.8rem);
+  font-size:clamp(1.1rem,4.5vw,1.6rem);
 }
 .machine{
   position:relative;
-  width:min(90vw,600px);
-  height:auto;
-  aspect-ratio:3/2;
+  width:min(92vw,500px);
+  height:360px;
   background:#111;
-  border:4px solid #0f0;
-  border-radius:25px;
-  box-shadow:0 0 40px #0f0 inset,0 0 60px #040;
-  padding:20px;
+  border:3px solid #0f0;
+  border-radius:20px;
+  box-shadow:0 0 30px #0f0 inset,0 0 50px #040;
+  padding:15px;
   overflow:visible;
-  z-index:1;
 }
 .machine::before,.machine::after{
   content:"";
@@ -49,14 +47,12 @@ h1{
   width:200%;
   height:200%;
   background:radial-gradient(circle at 50% 50%,rgba(255,255,255,0.05) 0%,rgba(0,0,0,0) 70%);
-  opacity:0.2;
+  opacity:0.25;
   animation:smoke 10s infinite alternate ease-in-out;
-  filter:blur(40px);
+  filter:blur(35px);
   z-index:-1;
 }
-.machine::after{
-  animation-delay:5s;
-}
+.machine::after{animation-delay:5s;}
 @keyframes smoke{
   0%{transform:translate(0,0);}
   50%{transform:translate(10px,-10px);}
@@ -65,48 +61,51 @@ h1{
 .reels{
   display:flex;
   justify-content:center;
-  gap:3vw;
+  gap:10px;
   perspective:900px;
-  margin-top:40px;
+  margin-top:25px;
 }
 .reel{
   flex:1;
-  min-width:90px;
-  max-width:140px;
-  height:30vh;
-  max-height:200px;
+  width:28%;
+  height:150px;
   background:#020;
   border:2px solid #0f0;
   border-radius:10px;
   display:flex;
   align-items:center;
   justify-content:center;
-  font-size:clamp(0.9rem,3vw,1.1rem);
+  font-size:clamp(0.8rem,3.5vw,1rem);
   color:#0f0;
-  box-shadow:inset 0 0 20px #000;
+  box-shadow:inset 0 0 15px #000;
   transform-style:preserve-3d;
   cursor:pointer;
   transition:0.3s;
+  padding:5px;
+  text-align:center;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
 }
-.reel.spin{animation:spin 0.5s linear infinite;}
+.reel.spin{animation:spin 0.45s linear infinite;}
 @keyframes spin{from{transform:rotateX(0deg);}to{transform:rotateX(-360deg);}}
 #msg{
   position:absolute;
-  top:10px;
+  top:8px;
   left:0;
   width:100%;
   text-align:center;
-  font-size:clamp(0.8rem,3vw,1rem);
+  font-size:clamp(0.75rem,3vw,0.95rem);
   opacity:0.85;
   animation:floatText 3s ease-in-out infinite alternate;
 }
-@keyframes floatText{from{transform:translateY(0);}to{transform:translateY(6px);}}
+@keyframes floatText{from{transform:translateY(0);}to{transform:translateY(5px);}}
 .lever{
   position:absolute;
-  right:-25px;
-  top:15px;
-  width:18px;
-  height:220px;
+  right:-15px;
+  top:10px;
+  width:14px;
+  height:180px;
   background:#333;
   border:2px solid #0f0;
   border-radius:10px;
@@ -118,29 +117,29 @@ h1{
   z-index:5;
 }
 .knob{
-  width:38px;
-  height:38px;
+  width:32px;
+  height:32px;
   background:#800;
   border:2px solid #0f0;
   border-radius:50%;
-  box-shadow:0 0 15px red;
+  box-shadow:0 0 12px red;
   position:relative;
-  top:-20px;
+  top:-18px;
   transition:transform 0.3s;
   animation:pulse 1.5s ease-in-out infinite alternate;
 }
-@keyframes pulse{from{box-shadow:0 0 10px red;}to{box-shadow:0 0 25px #f00;}}
-.knob.dragging{transform:translateY(160px);}
+@keyframes pulse{from{box-shadow:0 0 8px red;}to{box-shadow:0 0 18px #f00;}}
+.knob.dragging{transform:translateY(140px);}
 #counter{
-  margin-top:15px;
+  margin-top:10px;
   text-align:center;
-  font-size:clamp(1rem,3vw,1.2rem);
+  font-size:clamp(0.9rem,3vw,1.1rem);
   color:#0f0;
 }
 #footer{
-  margin-top:25px;
+  margin-top:15px;
   text-align:center;
-  font-size:clamp(0.9rem,3vw,1rem);
+  font-size:clamp(0.8rem,3vw,1rem);
 }
 #footer a{
   color:#00ffaa;
@@ -163,9 +162,7 @@ h1{
   </div>
 </div>
 <div id="counter"></div>
-<div id="footer">
-  👻 Follow the necromancer on <a href="https://t.me/dimasshortposts" target="_blank">Telegram</a>
-</div>
+<div id="footer">👻 Follow the necromancer on <a href="https://t.me/dimasshortposts" target="_blank">Telegram</a></div>
 
 <!-- звуки -->
 <audio id="spinSound" src="https://actions.google.com/sounds/v1/ambiences/steam_engine_idle.ogg" preload="auto" loop></audio>
@@ -199,18 +196,18 @@ function startSpin(){
   isSpinning=true;
   msg.innerText="⚙️ Spinning...";
   reels.forEach(r=>r.classList.add("spin"));
-  spinSound.volume=0.15;spinSound.play().catch(()=>{});
+  spinSound.volume=0.12;spinSound.play().catch(()=>{});
 }
 function stopSpin(data){
   spinSound.pause();
   reels.forEach((r,i)=>{
     setTimeout(()=>{
       r.classList.remove("spin");
-      stopSound.currentTime=0;stopSound.volume=0.3;stopSound.play().catch(()=>{});
+      stopSound.currentTime=0;stopSound.volume=0.25;stopSound.play().catch(()=>{});
       const repo=data[i];
       if(!repo){r.innerHTML="💀 Empty tomb";return;}
       const year=new Date(repo.pushed_at).getFullYear();
-      r.innerHTML=`<div style="text-align:center;pointer-events:none">
+      r.innerHTML=`<div style="text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
         <strong>🪦 ${repo.name}</strong><br>⭐ ${repo.stargazers_count}<br>🕰 ${year}
       </div>`;
       r.onclick=()=>{
@@ -221,16 +218,16 @@ function stopSpin(data){
         dingSound.play().catch(()=>{});
       };
       if(i===2)isSpinning=false;
-    },2200+i*600);
+    },2000+i*500);
   });
 }
 let dragging=false,startY=0;
 knob.addEventListener("mousedown",e=>{dragging=true;startY=e.clientY;triggered=false;});
 window.addEventListener("mousemove",e=>{
   if(!dragging)return;
-  let offset=Math.min(Math.max(e.clientY-startY,0),200);
+  let offset=Math.min(Math.max(e.clientY-startY,0),140);
   knob.style.transform=`translateY(${offset}px)`;
-  if(offset>100&&!triggered){
+  if(offset>90&&!triggered){
     triggered=true;
     cashSound.currentTime=0;cashSound.volume=0.4;cashSound.play().catch(()=>{});
   }
@@ -239,11 +236,11 @@ window.addEventListener("mouseup",async()=>{
   if(!dragging)return;dragging=false;
   const offset=parseInt(knob.style.transform.replace(/\D/g,''))||0;
   knob.style.transform='translateY(0px)';
-  if(offset>100){
+  if(offset>90){
     startSpin();
     try{
       const data=await getRepos();
-      setTimeout(()=>stopSpin(data),2500);
+      setTimeout(()=>stopSpin(data),2200);
     }catch(e){
       msg.innerText="⚠️ Spirits refused to answer.";
       reels.forEach(r=>r.classList.remove("spin"));
@@ -251,12 +248,13 @@ window.addEventListener("mouseup",async()=>{
     }
   }
 });
+/* Touch */
 knob.addEventListener("touchstart",e=>{dragging=true;startY=e.touches[0].clientY;triggered=false;});
 window.addEventListener("touchmove",e=>{
   if(!dragging)return;
-  let offset=Math.min(Math.max(e.touches[0].clientY-startY,0),200);
+  let offset=Math.min(Math.max(e.touches[0].clientY-startY,0),140);
   knob.style.transform=`translateY(${offset}px)`;
-  if(offset>100&&!triggered){
+  if(offset>90&&!triggered){
     triggered=true;
     cashSound.currentTime=0;cashSound.volume=0.4;cashSound.play().catch(()=>{});
   }
@@ -267,7 +265,7 @@ window.addEventListener("touchend",async()=>{
   startSpin();
   try{
     const data=await getRepos();
-    setTimeout(()=>stopSpin(data),2500);
+    setTimeout(()=>stopSpin(data),2200);
   }catch(e){
     msg.innerText="⚠️ Spirits refused to answer.";
     reels.forEach(r=>r.classList.remove("spin"));
