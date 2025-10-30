@@ -3,111 +3,122 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>🎰 Open Source Resurrection Machine</title>
+<title>🎃 Open Source Resurrection Machine</title>
 <style>
-body{
+body {
   margin:0;
-  background:radial-gradient(circle at center,#0a0a0a,#000);
-  color:#0f0;
+  background: radial-gradient(circle at center, #1a001a 0%, #000010 100%);
+  color:#9effd1;
   font-family:"Courier New",monospace;
+  height:100vh;
   display:flex;
   flex-direction:column;
   align-items:center;
-  justify-content:flex-start;
-  min-height:100vh;
+  justify-content:center;
   overflow:hidden;
-  padding:10px 0 20px 0;
   opacity:0;
   animation:fadeIn 2s forwards;
 }
-@keyframes fadeIn{to{opacity:1;}}
-h1{
-  color:#00ff9d;
-  text-shadow:0 0 10px #00ff9d;
-  margin:10px 0;
+@keyframes fadeIn {to{opacity:1;}}
+h1 {
+  color:#ff9df5;
+  text-shadow:0 0 10px #ff50f0, 0 0 30px #ff50f0;
+  margin-bottom:12px;
   text-align:center;
-  font-size:clamp(1.1rem,4.5vw,1.6rem);
+  font-size:clamp(1rem,4.5vw,1.6rem);
 }
-.machine{
+.machine {
   position:relative;
-  width:min(92vw,500px);
-  height:360px;
-  background:#111;
-  border:3px solid #0f0;
+  width:min(90vw,420px);
+  height:330px;
+  background:#150015;
+  border:2px solid #ff6eff;
   border-radius:20px;
-  box-shadow:0 0 30px #0f0 inset,0 0 50px #040;
-  padding:15px;
+  box-shadow:0 0 25px #ff45ff inset, 0 0 50px #220022;
+  display:flex;
+  flex-direction:column;
+  justify-content:flex-start;
+  align-items:center;
+  padding:18px;
   overflow:visible;
 }
-.machine::before,.machine::after{
+.machine::before {
   content:"";
   position:absolute;
-  top:-50%;
+  top:-60%;
+  left:50%;
+  transform:translateX(-50%);
+  width:400px;
+  height:400px;
+  background:radial-gradient(circle,rgba(255,200,100,0.15) 0%,transparent 70%);
+  z-index:-2;
+}
+.machine::after {
+  content:"";
+  position:absolute;
+  top:-30%;
   left:-50%;
   width:200%;
   height:200%;
-  background:radial-gradient(circle at 50% 50%,rgba(255,255,255,0.05) 0%,rgba(0,0,0,0) 70%);
+  background:radial-gradient(circle at 50% 50%,rgba(255,255,255,0.06) 0%,rgba(0,0,0,0) 70%);
   opacity:0.25;
-  animation:smoke 10s infinite alternate ease-in-out;
-  filter:blur(35px);
+  animation:smoke 12s infinite alternate ease-in-out;
+  filter:blur(40px);
   z-index:-1;
 }
-.machine::after{animation-delay:5s;}
-@keyframes smoke{
+@keyframes smoke {
   0%{transform:translate(0,0);}
-  50%{transform:translate(10px,-10px);}
-  100%{transform:translate(-10px,10px);}
+  50%{transform:translate(8px,-8px);}
+  100%{transform:translate(-8px,8px);}
 }
-.reels{
+#msg {
+  text-align:center;
+  font-size:clamp(0.8rem,3vw,1rem);
+  opacity:0.9;
+  color:#ffaaff;
+  text-shadow:0 0 8px #ff66ff;
+  margin-bottom:8px;
+  animation:floatText 3s ease-in-out infinite alternate;
+}
+@keyframes floatText {from{transform:translateY(0);}to{transform:translateY(6px);}}
+.reels {
   display:flex;
   justify-content:center;
   gap:10px;
   perspective:900px;
-  margin-top:25px;
+  margin-top:15px;
 }
-.reel{
+.reel {
   flex:1;
   width:28%;
-  height:150px;
-  background:#020;
-  border:2px solid #0f0;
+  height:120px;
+  background:#050008;
+  border:2px solid #00ffaa;
   border-radius:10px;
   display:flex;
   align-items:center;
   justify-content:center;
-  font-size:clamp(0.8rem,3.5vw,1rem);
-  color:#0f0;
+  font-size:clamp(0.8rem,3vw,1rem);
+  color:#00ffaa;
   box-shadow:inset 0 0 15px #000;
   transform-style:preserve-3d;
   cursor:pointer;
-  transition:0.3s;
-  padding:5px;
+  padding:4px;
   text-align:center;
   overflow:hidden;
   text-overflow:ellipsis;
   white-space:nowrap;
 }
-.reel.spin{animation:spin 0.45s linear infinite;}
-@keyframes spin{from{transform:rotateX(0deg);}to{transform:rotateX(-360deg);}}
-#msg{
+.reel.spin {animation:spin 0.45s linear infinite;}
+@keyframes spin {from{transform:rotateX(0deg);}to{transform:rotateX(-360deg);}}
+.lever {
   position:absolute;
-  top:8px;
-  left:0;
-  width:100%;
-  text-align:center;
-  font-size:clamp(0.75rem,3vw,0.95rem);
-  opacity:0.85;
-  animation:floatText 3s ease-in-out infinite alternate;
-}
-@keyframes floatText{from{transform:translateY(0);}to{transform:translateY(5px);}}
-.lever{
-  position:absolute;
-  right:-15px;
-  top:10px;
+  right:-18px;
+  top:12px;
   width:14px;
-  height:180px;
-  background:#333;
-  border:2px solid #0f0;
+  height:160px;
+  background:#330033;
+  border:2px solid #ff70ff;
   border-radius:10px;
   cursor:pointer;
   display:flex;
@@ -116,42 +127,50 @@ h1{
   justify-content:flex-start;
   z-index:5;
 }
-.knob{
+.knob {
   width:32px;
   height:32px;
-  background:#800;
-  border:2px solid #0f0;
+  background:#f60;
+  border:2px solid #ffbb55;
   border-radius:50%;
-  box-shadow:0 0 12px red;
+  box-shadow:0 0 15px #f80;
   position:relative;
   top:-18px;
   transition:transform 0.3s;
   animation:pulse 1.5s ease-in-out infinite alternate;
 }
-@keyframes pulse{from{box-shadow:0 0 8px red;}to{box-shadow:0 0 18px #f00;}}
-.knob.dragging{transform:translateY(140px);}
-#counter{
+@keyframes pulse {
+  from{box-shadow:0 0 10px #f80;}
+  to{box-shadow:0 0 25px #ffb347;}
+}
+.knob.dragging{transform:translateY(120px);}
+#counter {
   margin-top:10px;
   text-align:center;
   font-size:clamp(0.9rem,3vw,1.1rem);
-  color:#0f0;
+  color:#ffb4ff;
+  text-shadow:0 0 10px #ff70ff;
 }
-#footer{
-  margin-top:15px;
+#footer {
+  margin-top:10px;
   text-align:center;
   font-size:clamp(0.8rem,3vw,1rem);
+  color:#ffb4ff;
 }
-#footer a{
-  color:#00ffaa;
+#footer a {
+  color:#ffaaff;
   text-decoration:none;
-  text-shadow:0 0 8px #00ffaa;
+  text-shadow:0 0 8px #ff66ff;
   transition:0.2s;
 }
-#footer a:hover{color:#fff;text-shadow:0 0 15px #0f0;}
+#footer a:hover {
+  color:#fff;
+  text-shadow:0 0 15px #fff;
+}
 </style>
 </head>
 <body>
-<h1>🪦 Open Source Resurrection Machine</h1>
+<h1>🎃 Open Source Resurrection Machine</h1>
 <div class="machine">
   <div id="msg">☠️ Pull the lever to see dead repositories</div>
   <div class="lever" id="lever"><div class="knob" id="knob"></div></div>
@@ -162,9 +181,9 @@ h1{
   </div>
 </div>
 <div id="counter"></div>
-<div id="footer">👻 Follow the necromancer on <a href="https://t.me/dimasshortposts" target="_blank">Telegram</a></div>
+<div id="footer">🕯️ Follow the necromancer on <a href="https://t.me/dimasshortposts" target="_blank">Telegram</a></div>
 
-<!-- звуки -->
+<!-- sounds -->
 <audio id="spinSound" src="https://actions.google.com/sounds/v1/ambiences/steam_engine_idle.ogg" preload="auto" loop></audio>
 <audio id="stopSound" src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg" preload="auto"></audio>
 <audio id="dingSound" src="https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg" preload="auto"></audio>
@@ -181,8 +200,7 @@ const dingSound=document.getElementById("dingSound");
 const cashSound=document.getElementById("cashSound");
 let souls=Number(localStorage.getItem("soulsRevived")||0);
 counter.innerText=`✨ Souls revived today: ${souls}`;
-let isSpinning=false;
-let triggered=false;
+let isSpinning=false,triggered=false;
 
 async function getRepos(){
   const page=Math.floor(Math.random()*30)+1;
@@ -196,23 +214,27 @@ function startSpin(){
   isSpinning=true;
   msg.innerText="⚙️ Spinning...";
   reels.forEach(r=>r.classList.add("spin"));
-  spinSound.volume=0.12;spinSound.play().catch(()=>{});
+  spinSound.volume=0.12;
+  spinSound.play().catch(()=>{});
 }
 function stopSpin(data){
   spinSound.pause();
   reels.forEach((r,i)=>{
     setTimeout(()=>{
       r.classList.remove("spin");
-      stopSound.currentTime=0;stopSound.volume=0.25;stopSound.play().catch(()=>{});
+      stopSound.currentTime=0;
+      stopSound.volume=0.25;
+      stopSound.play().catch(()=>{});
       const repo=data[i];
       if(!repo){r.innerHTML="💀 Empty tomb";return;}
       const year=new Date(repo.pushed_at).getFullYear();
-      r.innerHTML=`<div style="text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+      r.innerHTML=`<div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
         <strong>🪦 ${repo.name}</strong><br>⭐ ${repo.stargazers_count}<br>🕰 ${year}
       </div>`;
       r.onclick=()=>{
         window.open(repo.html_url,"_blank");
-        souls++;localStorage.setItem("soulsRevived",souls);
+        souls++;
+        localStorage.setItem("soulsRevived",souls);
         counter.innerText=`✨ Souls revived today: ${souls}`;
         msg.innerText="⭐ Light a star to bless one of them";
         dingSound.play().catch(()=>{});
@@ -225,7 +247,7 @@ let dragging=false,startY=0;
 knob.addEventListener("mousedown",e=>{dragging=true;startY=e.clientY;triggered=false;});
 window.addEventListener("mousemove",e=>{
   if(!dragging)return;
-  let offset=Math.min(Math.max(e.clientY-startY,0),140);
+  let offset=Math.min(Math.max(e.clientY-startY,0),120);
   knob.style.transform=`translateY(${offset}px)`;
   if(offset>90&&!triggered){
     triggered=true;
@@ -248,11 +270,10 @@ window.addEventListener("mouseup",async()=>{
     }
   }
 });
-/* Touch */
 knob.addEventListener("touchstart",e=>{dragging=true;startY=e.touches[0].clientY;triggered=false;});
 window.addEventListener("touchmove",e=>{
   if(!dragging)return;
-  let offset=Math.min(Math.max(e.touches[0].clientY-startY,0),140);
+  let offset=Math.min(Math.max(e.touches[0].clientY-startY,0),120);
   knob.style.transform=`translateY(${offset}px)`;
   if(offset>90&&!triggered){
     triggered=true;
