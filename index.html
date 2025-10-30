@@ -3,130 +3,80 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>💀 Commit Rain</title>
+<title>🪦 Open Source Resurrection Machine</title>
 <style>
-  html, body {
-    margin: 0;
-    height: 100%;
-    background: radial-gradient(ellipse at center, #060606, #000);
-    overflow: hidden;
-    color: #0f0;
-    font-family: monospace;
-  }
-  #overlay {
-    position: absolute;
-    top: 30%;
-    width: 100%;
-    text-align: center;
-    color: #00ff9d;
-    font-size: 1.4rem;
-    text-shadow: 0 0 10px #00ff9d;
-    letter-spacing: 2px;
-    opacity: 0;
-    transition: opacity 2s;
-  }
-  canvas {
-    display: block;
-  }
+body {
+  background: radial-gradient(circle at center, #0b0b0b, #000);
+  color: #eee;
+  font-family: 'Courier New', monospace;
+  text-align: center;
+  padding: 40px;
+}
+h1 { color: #00ff99; text-shadow: 0 0 10px #00ff99; }
+button {
+  background: #111;
+  color: #00ff99;
+  border: 1px solid #00ff99;
+  padding: 10px 25px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  margin-top: 20px;
+  transition: 0.2s;
+}
+button:hover { background: #00ff99; color: #000; }
+#slots {
+  display: flex; justify-content: center;
+  gap: 20px; margin-top: 30px;
+}
+.slot {
+  width: 240px; height: 160px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid #333;
+  border-radius: 12px;
+  padding: 15px;
+  box-shadow: 0 0 10px #111;
+}
+a { color: #00ffaa; text-decoration: none; }
+a:hover { text-decoration: underline; }
+#msg { margin-top: 30px; opacity: 0.7; }
 </style>
 </head>
 <body>
-<canvas id="c"></canvas>
-<div id="overlay">Summoning commits...</div>
+<h1>🪦 The Open Source Resurrection Machine</h1>
+<p>Find forgotten projects... and give them a star ⭐</p>
+<div id="slots">
+  <div class="slot">🕳</div>
+  <div class="slot">🕳</div>
+  <div class="slot">🕳</div>
+</div>
+<button id="spin">🎰 SPIN</button>
+<div id="msg"></div>
 
 <script>
-const canvas = document.getElementById('c');
-const ctx = canvas.getContext('2d');
-canvas.width = innerWidth;
-canvas.height = innerHeight;
-
-let drops = [];
-let messages = [];
-const chars = '01ABCDEFGHIJKLMNOPQRSTUVWXYZ@#$%^&*()'.split('');
-const spookyFallback = [
-  "summon(devil);", 
-  "fix: ritual bug", 
-  "feat: eternal darkness",
-  "chore: feed the demons",
-  "refactor: undead code",
-  "merge branch 'graveyard'",
-  "hotfix: prod possession",
-  "test: ghost integration"
-];
-
-function getUserFromUrl() {
-  const p = new URLSearchParams(window.location.search);
-  return p.get('user');
-}
-
-async function fetchCommits(user) {
-  const overlay = document.getElementById('overlay');
-  overlay.style.opacity = 1;
-  overlay.innerText = `Summoning commits from @${user}...`;
+async function spin() {
+  document.getElementById("msg").innerText = "Summoning old souls...";
+  const page = Math.floor(Math.random() * 20) + 1;
+  const url = `https://api.github.com/search/repositories?q=stars:<10+pushed:<2020-01-01&sort=updated&order=asc&per_page=3&page=${page}`;
   try {
-    const resp = await fetch(`https://api.github.com/users/${user}/events/public`);
+    const resp = await fetch(url);
     const data = await resp.json();
-    const commits = data
-      .filter(e => e.type === "PushEvent")
-      .flatMap(e => e.payload.commits)
-      .slice(0, 30)
-      .map(c => c.message);
-    overlay.innerText = commits.length
-      ? `The code of @${user} descends...`
-      : `No recent commits found... spirits are silent.`;
-    messages = commits.length ? commits : spookyFallback;
-  } catch (err) {
-    overlay.innerText = "Summoning failed. Spirits are angry.";
-    messages = spookyFallback;
-  }
-  setTimeout(() => overlay.style.opacity = 0, 3000);
-}
-
-class Drop {
-  constructor(x, y, text) {
-    this.x = x;
-    this.y = y;
-    this.text = text;
-    this.speed = 2 + Math.random() * 3;
-    this.alpha = 1;
-  }
-  draw() {
-    ctx.fillStyle = `rgba(0,255,100,${this.alpha})`;
-    ctx.fillText(this.text, this.x, this.y);
-  }
-  update() {
-    this.y += this.speed;
-    this.alpha -= 0.002;
+    const slots = document.querySelectorAll('.slot');
+    slots.forEach((slot, i) => {
+      const repo = data.items[i];
+      if (!repo) { slot.innerHTML = "💀 empty tomb"; return; }
+      const pushed = new Date(repo.pushed_at).getFullYear();
+      slot.innerHTML = `
+        <h3>🪦 ${repo.name}</h3>
+        <p>Last commit: ${pushed}</p>
+        <p><a href="${repo.html_url}" target="_blank">Open repo ↗</a></p>
+      `;
+    });
+    document.getElementById("msg").innerText = "✨ Bless one... make a coder smile.";
+  } catch (e) {
+    document.getElementById("msg").innerText = "⚠️ Spirits refused to answer.";
   }
 }
-
-function animate() {
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  drops.forEach((d, i) => {
-    d.update();
-    d.draw();
-    if (d.y > canvas.height || d.alpha <= 0) drops.splice(i, 1);
-  });
-
-  if (Math.random() < 0.2 && messages.length) {
-    const msg = messages[Math.floor(Math.random() * messages.length)];
-    drops.push(new Drop(Math.random() * canvas.width, 0, msg));
-  }
-
-  requestAnimationFrame(animate);
-}
-
-function start() {
-  ctx.font = '16px monospace';
-  const user = getUserFromUrl();
-  if (user) fetchCommits(user);
-  else messages = spookyFallback;
-  animate();
-}
-
-start();
+document.getElementById("spin").onclick = spin;
 </script>
 </body>
 </html>
