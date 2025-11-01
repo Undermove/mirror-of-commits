@@ -133,7 +133,8 @@
       waveCap: 190,
       waveCapped: false,
       endlessShown: false,
-      endlessMode: false
+      endlessMode: false,
+      zombieId: 0
     };
 
     function resize() {
@@ -144,6 +145,17 @@
       canvas.height = Math.floor(state.h * state.dpr);
       ctx.setTransform(state.dpr,0,0,state.dpr,0,0);
     }
+
+    // Seeded random helpers for deterministic per-zombie variations
+    function mulberry32(a){
+      return function(){
+        let t = a += 0x6D2B79F5;
+        t = Math.imul(t ^ t >>> 15, t | 1);
+        t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+        return ((t ^ t >>> 14) >>> 0) / 4294967296;
+      }
+    }
+    function seeded01(seed){ const r = mulberry32(seed>>>0); return r(); }
 
     // Wave cap progression: 130, 160, 190, ... (+30 per wave)
     function getWaveCap(w){
@@ -915,11 +927,15 @@
     }
 
     class Zombie{
-      constructor(x,y, hp, speed, tier, coverDmgRate, scale){
+      constructor(x,y, hp, speed, tier, coverDmgRate, scale, id, visLevel){
         this.x=x; this.y=y;
         this.tier = Math.max(0, Math.floor(tier||0));
         this.scale = scale || 1;
-        this.r = 18 * this.scale * (1 + 0.08*this.tier);
+        this.id = (id==null? 0 : id)|0;
+        this.visLevel = Math.max(0, Math.floor(visLevel||0));
+        // size scales sublinearly with visual level to avoid absurd growth
+        const sizeMul = 1 + 0.14 * Math.sqrt(this.visLevel);
+        this.r = 18 * this.scale * (1 + 0.08*this.tier) * sizeMul;
         this.hp=hp;
         this.speed=speed;
         this.baseSpeed = speed;
@@ -928,6 +944,8 @@
         // slow effect
         this.slowMul = 1; // 1 = no slow; <1 = slowed
         this.slowTimer = 0;
+        // rng per zombie for consistent cosmetic jitter
+        this.rand = mulberry32((this.id*1664525 + 1013904223)>>>0);
       }
       update(dt){
         // Move towards player
@@ -960,35 +978,81 @@
         this.slowTimer = Math.max(this.slowTimer, duration);
       }
       draw(){
-        // palette per tier
-        const palette = ['#74d874','#5cc45c','#46a946','#318431'];
-        const baseCol = palette[Math.min(this.tier, palette.length-1)];
-        const color = this.hurtTimer>0 ? '#a6f7a6' : baseCol;
-        ctx.fillStyle = color;
+        // base color: shift hue/darken with level
+        const hue = 120 - Math.min(60, this.visLevel*3); // 120..60
+        const light = 60 - Math.min(25, this.visLevel*2); // 60..35
+        const fillCol = this.hurtTimer>0 ? 'hsl(120,80%,80%)' : `hsl(${hue}, 45%, ${light}%)`;
+        // body
+        ctx.fillStyle = fillCol;
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.r, 0, TAU);
         ctx.fill();
 
-        // face changes with tier
-        // eyes
+        // head spikes proportional to visLevel (capped)
+        const spikes = Math.min(18, Math.floor(this.visLevel/2));
+        if (spikes>0){
+          ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+          ctx.lineWidth = Math.max(1, this.r*0.04);
+          const base = this.rand();
+          for (let i=0;i<spikes;i++){
+            const ang = (i/spikes)*TAU*0.9 + base*0.4; // not full circle to keep face clean
+            const sx = this.x + Math.cos(ang)*this.r;
+            const sy = this.y + Math.sin(ang)*this.r;
+            const ex = this.x + Math.cos(ang)*(this.r + 6 + this.visLevel*0.8);
+            const ey = this.y + Math.sin(ang)*(this.r + 6 + this.visLevel*0.8);
+            ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke();
+          }
+        }
+
+        // eyes: become narrower and angrier with level
+        const eBase = Math.max(2, this.r*0.12);
+        const squint = Math.min(0.7, this.visLevel*0.06);
+        const eyeW = eBase*(1.2 + 0.1*this.tier);
+        const eyeH = eBase*(1 - squint);
         ctx.fillStyle = '#0b1020';
-        const e = Math.max(2, this.r*0.12);
-        ctx.beginPath(); ctx.arc(this.x - this.r*0.25, this.y - this.r*0.15, e, 0, TAU); ctx.fill();
-        ctx.beginPath(); ctx.arc(this.x + this.r*0.25, this.y - this.r*0.12, e, 0, TAU); ctx.fill();
-        // mouth
-        if (this.tier <= 0){
-          ctx.fillStyle = '#0a0';
-          ctx.fillRect(this.x-5, this.y+2, 10, 3);
-        } else if (this.tier === 1){
-          ctx.fillStyle = '#083';
-          ctx.fillRect(this.x-8, this.y+3, 16, 4);
-        } else {
-          // big mouth with simple fangs
-          ctx.fillStyle = '#062';
-          ctx.fillRect(this.x-10, this.y+3, 20, 5);
-          ctx.fillStyle = '#fff';
-          ctx.beginPath(); ctx.moveTo(this.x-4, this.y+3); ctx.lineTo(this.x-2, this.y+8); ctx.lineTo(this.x, this.y+3); ctx.closePath(); ctx.fill();
-          ctx.beginPath(); ctx.moveTo(this.x+4, this.y+3); ctx.lineTo(this.x+2, this.y+8); ctx.lineTo(this.x, this.y+3); ctx.closePath(); ctx.fill();
+        // left eye
+        ctx.save();
+        ctx.translate(this.x - this.r*0.28, this.y - this.r*0.15);
+        ctx.rotate(-0.15 - squint*0.3);
+        ctx.beginPath(); ctx.ellipse(0,0, eyeW, eyeH, 0, 0, TAU); ctx.fill();
+        ctx.restore();
+        // right eye
+        ctx.save();
+        ctx.translate(this.x + this.r*0.28, this.y - this.r*0.13);
+        ctx.rotate(0.15 + squint*0.3);
+        ctx.beginPath(); ctx.ellipse(0,0, eyeW, eyeH, 0, 0, TAU); ctx.fill();
+        ctx.restore();
+
+        // mouth and teeth count scale with level
+        const mouthW = Math.max(10, this.r*0.9);
+        const mouthH = Math.max(4, this.r*0.18);
+        const mx = this.x - mouthW*0.5, my = this.y + this.r*0.15;
+        // dark mouth cavity
+        ctx.fillStyle = `rgba(0,0,0,0.55)`;
+        ctx.fillRect(mx, my, mouthW, mouthH);
+        // teeth as triangles along top and bottom
+        const teeth = Math.min(24, 2 + Math.floor(this.visLevel*0.8));
+        ctx.fillStyle = '#fff';
+        for (let i=0;i<teeth;i++){
+          const t = (i+0.5)/teeth;
+          const tx = mx + t*mouthW;
+          const jitter = (this.rand()-0.5)*2;
+          const hTop = mouthH*0.7*(0.7 + 0.3*(this.rand()));
+          // top tooth
+          ctx.beginPath();
+          ctx.moveTo(tx-2, my);
+          ctx.lineTo(tx+2, my);
+          ctx.lineTo(tx + jitter, my - hTop);
+          ctx.closePath(); ctx.fill();
+          // bottom tooth (every second for density)
+          if (i%2===0){
+            const hBot = mouthH*0.55*(0.7 + 0.3*(this.rand()));
+            ctx.beginPath();
+            ctx.moveTo(tx-2, my+mouthH);
+            ctx.lineTo(tx+2, my+mouthH);
+            ctx.lineTo(tx + jitter*0.6, my+mouthH + hBot);
+            ctx.closePath(); ctx.fill();
+          }
         }
       }
     }
@@ -1013,7 +1077,8 @@
         const hp = rand(25, 50);
         const sp = rand(70, 110);
         const scale = rand(0.85, 1.0);
-        const z = new Zombie(x,y,hp, sp, 0, 6, scale);
+        const vis = Math.max(0, Math.floor(state.wave*0.6) + randInt(0,1));
+        const z = new Zombie(x,y,hp, sp, 0, 6, scale, ++state.zombieId, vis);
         state.zombies.push(z);
       } else {
         const t = state.time;
@@ -1022,7 +1087,10 @@
         const sp = clamp(90 + t*0.9 + tier*5, 90, 180);
         const scale = 1.0 + tier*0.05;
         const coverDmg = 18 + tier*10;
-        const z = new Zombie(x,y,hp, sp, tier, coverDmg, scale);
+        const vis = Math.max(1,
+          Math.floor(state.wave) + tier*2 + (state.endlessMode ? Math.floor(state.time/60) : 0)
+        );
+        const z = new Zombie(x,y,hp, sp, tier, coverDmg, scale, ++state.zombieId, vis);
         state.zombies.push(z);
       }
       state.zombiesSpawned += 1;
