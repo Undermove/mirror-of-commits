@@ -217,13 +217,17 @@
         this.recoil *= Math.pow(0.001, dt); // fast decay
       }
       shoot(){
-        const pellets = 7;
-        const spread = 0.38; // radians total spread half-angle
-        const speed = 820;
-        const dmg = 34;
+        const basePellets = 7;
+        const pellets = Math.max(5, basePellets + randInt(-1, 1)); // small per-shot variation
+        const spreadBase = 0.15; // narrower cone
+        const spread = spreadBase * rand(0.8, 1.3); // per-shot variation
+        const speed = 1200; // faster bullets
+        const dmg = 70; // more lethal
+        const aimOffset = rand(-0.04, 0.04); // slight per-shot offset
+        const baseAim = this.aim + aimOffset;
 
         for (let i=0;i<pellets;i++){
-          const a = this.aim + rand(-spread, spread);
+          const a = baseAim + rand(-spread, spread);
           const vx = Math.cos(a)*speed;
           const vy = Math.sin(a)*speed;
           const px = this.x + Math.cos(this.aim)*this.r*0.8;
