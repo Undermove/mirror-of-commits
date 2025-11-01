@@ -93,6 +93,85 @@
     const length = (x,y)=>Math.hypot(x,y);
     const norm = (x,y)=>{const l=length(x,y)||1; return {x:x/l,y:y/l};}
     const dist2 = (a,b)=>{const dx=a.x-b.x, dy=a.y-b.y; return dx*dx+dy*dy; }
+    const DESPAWN_MARGIN = 60;
+
+    // Simple WebAudio synth for SFX (no external files)
+    const audio = {
+      ctx: null,
+      ensure(){
+        if (!this.ctx){
+          const AC = window.AudioContext || window.webkitAudioContext;
+          if (!AC) return;
+          this.ctx = new AC();
+        }
+      },
+      resume(){ if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume(); },
+      shot(){
+        this.ensure(); if (!this.ctx) return;
+        const ctx = this.ctx; const now = ctx.currentTime;
+        const dur = 0.22 + Math.random()*0.05;
+        // white noise burst
+        const buffer = ctx.createBuffer(1, Math.floor(ctx.sampleRate*dur), ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i=0;i<data.length;i++) data[i] = (Math.random()*2-1) * (1 - i/data.length);
+        const src = ctx.createBufferSource(); src.buffer = buffer;
+        const bp = ctx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value = 1200 + Math.random()*500; bp.Q.value = 0.6;
+        const lp = ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value = 2200 + Math.random()*800; lp.Q.value = 0.2;
+        const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, now); g.gain.exponentialRampToValueAtTime(1.0, now+0.01); g.gain.exponentialRampToValueAtTime(0.0001, now+dur);
+        src.connect(bp); bp.connect(lp); lp.connect(g); g.connect(ctx.destination);
+        src.start(now); src.stop(now+dur);
+        // low thump
+        const osc = ctx.createOscillator(); osc.type='sine';
+        osc.frequency.setValueAtTime(120, now);
+        osc.frequency.exponentialRampToValueAtTime(60, now+0.08);
+        const g2 = ctx.createGain(); g2.gain.setValueAtTime(0.0001, now); g2.gain.exponentialRampToValueAtTime(0.4, now+0.005); g2.gain.exponentialRampToValueAtTime(0.0001, now+0.1);
+        osc.connect(g2); g2.connect(ctx.destination); osc.start(now); osc.stop(now+0.11);
+      },
+      hit(){
+        this.ensure(); if (!this.ctx) return;
+        const ctx=this.ctx; const now=ctx.currentTime;
+        const osc = ctx.createOscillator(); osc.type='square';
+        const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, now); g.gain.exponentialRampToValueAtTime(0.3, now+0.005); g.gain.exponentialRampToValueAtTime(0.0001, now+0.06);
+        osc.frequency.setValueAtTime(1500, now);
+        osc.frequency.exponentialRampToValueAtTime(800, now+0.06);
+        osc.connect(g); g.connect(ctx.destination); osc.start(now); osc.stop(now+0.07);
+      },
+      hurt(){
+        this.ensure(); if (!this.ctx) return;
+        const ctx=this.ctx; const now=ctx.currentTime;
+        const osc = ctx.createOscillator(); osc.type='sawtooth';
+        const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, now); g.gain.exponentialRampToValueAtTime(0.35, now+0.01); g.gain.exponentialRampToValueAtTime(0.0001, now+0.18);
+        osc.frequency.setValueAtTime(250, now);
+        osc.frequency.exponentialRampToValueAtTime(120, now+0.18);
+        osc.connect(g); g.connect(ctx.destination); osc.start(now); osc.stop(now+0.19);
+      },
+      kill(){
+        this.ensure(); if (!this.ctx) return;
+        const ctx=this.ctx; const now=ctx.currentTime;
+        const osc = ctx.createOscillator(); osc.type='triangle';
+        const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, now); g.gain.exponentialRampToValueAtTime(0.25, now+0.01); g.gain.exponentialRampToValueAtTime(0.0001, now+0.12);
+        osc.frequency.setValueAtTime(160, now);
+        osc.frequency.exponentialRampToValueAtTime(90, now+0.12);
+        osc.connect(g); g.connect(ctx.destination); osc.start(now); osc.stop(now+0.13);
+      },
+      gameOver(){
+        this.ensure(); if (!this.ctx) return;
+        const ctx=this.ctx; const now=ctx.currentTime;
+        const osc = ctx.createOscillator(); osc.type='sine';
+        const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, now); g.gain.exponentialRampToValueAtTime(0.25, now+0.02); g.gain.exponentialRampToValueAtTime(0.0001, now+0.5);
+        osc.frequency.setValueAtTime(400, now);
+        osc.frequency.exponentialRampToValueAtTime(220, now+0.25);
+        osc.connect(g); g.connect(ctx.destination); osc.start(now); osc.stop(now+0.5);
+      }
+    };
+
+    function initAudioOnGesture(){
+      const boot = () => { audio.ensure(); audio.resume(); };
+      window.addEventListener('mousedown', boot, {once:true});
+      window.addEventListener('keydown', boot, {once:true});
+      window.addEventListener('touchstart', boot, {once:true, passive:true});
+    }
+    initAudioOnGesture();
 
     class Player {
       constructor(x,y){
@@ -141,9 +220,7 @@
         const pellets = 7;
         const spread = 0.38; // radians total spread half-angle
         const speed = 820;
-        const life = 0.6;
         const dmg = 34;
-        const kick = 10;
 
         for (let i=0;i<pellets;i++){
           const a = this.aim + rand(-spread, spread);
@@ -151,17 +228,20 @@
           const vy = Math.sin(a)*speed;
           const px = this.x + Math.cos(this.aim)*this.r*0.8;
           const py = this.y + Math.sin(this.aim)*this.r*0.8;
-          state.bullets.push(new Bullet(px,py,vx,vy, life, dmg));
+          state.bullets.push(new Bullet(px,py,vx,vy, dmg));
         }
         // Recoil and screen shake
         this.recoil += 1;
         state.shake = Math.min(10, state.shake + 3);
+        // Sound
+        audio.shot();
       }
       hurt(amount){
         if (this.damageCooldown>0) return;
         this.hp -= amount;
         this.damageCooldown = 0.6;
         state.shake = Math.min(12, state.shake + 4);
+        audio.hurt();
         if (this.hp <= 0){
           gameOver();
         }
@@ -208,15 +288,14 @@
     }
 
     class Bullet{
-      constructor(x,y,vx,vy, ttl, dmg){
+      constructor(x,y,vx,vy, dmg){
         this.x=x; this.y=y; this.vx=vx; this.vy=vy;
-        this.ttl=ttl; this.r=3;
+        this.r=3;
         this.dmg=dmg;
       }
       update(dt){
         this.x += this.vx*dt;
         this.y += this.vy*dt;
-        this.ttl -= dt;
       }
       draw(){
         ctx.fillStyle = '#ffd166';
@@ -290,6 +369,7 @@
       state.running = false;
       overlay.classList.add('show');
       final.textContent = 'Счёт: ' + state.score;
+      audio.gameOver();
     }
 
     function restart(){
@@ -322,8 +402,8 @@
       for (let i=state.bullets.length-1; i>=0; i--){
         const b = state.bullets[i];
         b.update(dt);
-        // Out of bounds or expired
-        if (b.ttl <= 0 || b.x<-50 || b.y<-50 || b.x>state.w+50 || b.y>state.h+50){
+        // Despawn beyond map bounds
+        if (b.x < -DESPAWN_MARGIN || b.y < -DESPAWN_MARGIN || b.x > state.w + DESPAWN_MARGIN || b.y > state.h + DESPAWN_MARGIN){
           state.bullets.splice(i,1);
         }
       }
@@ -338,12 +418,14 @@
           const rr = (z.r + b.r);
           if (dist2(z, b) < rr*rr){
             z.hurt(b.dmg);
+            audio.hit();
             state.bullets.splice(j,1);
           }
         }
         if (z.hp <= 0){
           state.zombies.splice(i,1);
           state.score += 1;
+          audio.kill();
         }
       }
 
