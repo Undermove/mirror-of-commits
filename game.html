@@ -1,0 +1,418 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <title>Topdown Shooter: Zombies</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #0f0f12; color: #e6e6e6; font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Inter, Arial, sans-serif; }
+    canvas { display: block; width: 100vw; height: 100vh; cursor: crosshair; }
+    #ui { position: fixed; left: 16px; top: 12px; z-index: 10; user-select: none; }
+    #ui .stat { font-weight: 700; font-size: 14px; line-height: 1.2; margin-bottom: 6px; }
+    #ui .hint { opacity: .7; font-size: 12px; }
+
+    .overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.5); z-index: 20; }
+    .overlay.show { display: flex; }
+    .panel { background: rgba(20,20,26,.9); padding: 24px 28px; border: 1px solid rgba(255,255,255,.1); border-radius: 12px; text-align: center; box-shadow: 0 8px 30px rgba(0,0,0,.6); }
+    .panel h1 { margin: 0 0 8px; font-size: 24px; }
+    .panel p { margin: 6px 0 0; opacity: .85; }
+  </style>
+</head>
+<body>
+  <div id="ui">
+    <div class="stat" id="score">Score: 0</div>
+    <div class="stat" id="health">HP: 100</div>
+    <div class="hint">WASD: движение • Мышь: прицел • ЛКМ: стрелять • R: рестарт</div>
+  </div>
+  <canvas id="game"></canvas>
+
+  <div class="overlay" id="gameover">
+    <div class="panel">
+      <h1>Вы погибли</h1>
+      <p id="final">Счёт: 0</p>
+      <p>Нажмите R для рестарта</p>
+    </div>
+  </div>
+
+  <script>
+  (() => {
+    const canvas = document.getElementById('game');
+    const ctx = canvas.getContext('2d');
+    const uiScore = document.getElementById('score');
+    const uiHP = document.getElementById('health');
+    const overlay = document.getElementById('gameover');
+    const final = document.getElementById('final');
+
+    const state = {
+      w: 0, h: 0, dpr: window.devicePixelRatio || 1,
+      running: true,
+      score: 0,
+      time: 0,
+      spawnTimer: 0,
+      spawnInterval: 1.1,
+      keys: new Set(),
+      mouse: {x: 0, y: 0, down: false},
+      bullets: [],
+      zombies: [],
+      player: null,
+      shake: 0
+    };
+
+    function resize() {
+      state.dpr = window.devicePixelRatio || 1;
+      state.w = Math.max(320, window.innerWidth);
+      state.h = Math.max(240, window.innerHeight);
+      canvas.width = Math.floor(state.w * state.dpr);
+      canvas.height = Math.floor(state.h * state.dpr);
+      ctx.setTransform(state.dpr,0,0,state.dpr,0,0);
+    }
+    window.addEventListener('resize', resize, {passive:true});
+    resize();
+
+    // Input
+    window.addEventListener('mousemove', (e) => {
+      const r = canvas.getBoundingClientRect();
+      state.mouse.x = e.clientX - r.left;
+      state.mouse.y = e.clientY - r.top;
+    });
+    window.addEventListener('mousedown', () => state.mouse.down = true);
+    window.addEventListener('mouseup', () => state.mouse.down = false);
+    window.addEventListener('blur', () => { state.keys.clear(); state.mouse.down = false; });
+    window.addEventListener('keydown', (e) => {
+      const k = e.key.toLowerCase();
+      if (k === 'r') { if (!state.running) restart(); }
+      state.keys.add(k);
+    });
+    window.addEventListener('keyup', (e) => state.keys.delete(e.key.toLowerCase()));
+
+    // Utils
+    const TAU = Math.PI*2;
+    const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+    const rand = (a,b)=>a + Math.random()*(b-a);
+    const randInt = (a,b)=>Math.floor(rand(a,b+1));
+    const length = (x,y)=>Math.hypot(x,y);
+    const norm = (x,y)=>{const l=length(x,y)||1; return {x:x/l,y:y/l};}
+    const dist2 = (a,b)=>{const dx=a.x-b.x, dy=a.y-b.y; return dx*dx+dy*dy; }
+
+    class Player {
+      constructor(x,y){
+        this.x=x; this.y=y;
+        this.r = 18;
+        this.speed = 260;
+        this.hp = 100;
+        this.fireCooldown = 0;
+        this.fireRate = 0.28; // seconds between shots
+        this.recoil = 0;
+        this.damageCooldown = 0; // i-frames
+      }
+      update(dt){
+        // Movement
+        let ax=0, ay=0;
+        if (state.keys.has('w') || state.keys.has('arrowup')) ay -= 1;
+        if (state.keys.has('s') || state.keys.has('arrowdown')) ay += 1;
+        if (state.keys.has('a') || state.keys.has('arrowleft')) ax -= 1;
+        if (state.keys.has('d') || state.keys.has('arrowright')) ax += 1;
+        if (ax || ay){
+          const m = norm(ax,ay);
+          this.x += m.x*this.speed*dt;
+          this.y += m.y*this.speed*dt;
+        }
+        // Clamp to screen
+        this.x = clamp(this.x, this.r, state.w - this.r);
+        this.y = clamp(this.y, this.r, state.h - this.r);
+
+        // Aim
+        this.aim = Math.atan2(state.mouse.y - this.y, state.mouse.x - this.x);
+
+        // Shooting
+        this.fireCooldown -= dt;
+        if (state.mouse.down && this.fireCooldown <= 0 && state.running){
+          this.shoot();
+          this.fireCooldown = this.fireRate;
+        }
+
+        // Damage cooldown
+        this.damageCooldown = Math.max(0, this.damageCooldown - dt);
+
+        // Recoil decay
+        this.recoil *= Math.pow(0.001, dt); // fast decay
+      }
+      shoot(){
+        const pellets = 7;
+        const spread = 0.38; // radians total spread half-angle
+        const speed = 820;
+        const life = 0.6;
+        const dmg = 34;
+        const kick = 10;
+
+        for (let i=0;i<pellets;i++){
+          const a = this.aim + rand(-spread, spread);
+          const vx = Math.cos(a)*speed;
+          const vy = Math.sin(a)*speed;
+          const px = this.x + Math.cos(this.aim)*this.r*0.8;
+          const py = this.y + Math.sin(this.aim)*this.r*0.8;
+          state.bullets.push(new Bullet(px,py,vx,vy, life, dmg));
+        }
+        // Recoil and screen shake
+        this.recoil += 1;
+        state.shake = Math.min(10, state.shake + 3);
+      }
+      hurt(amount){
+        if (this.damageCooldown>0) return;
+        this.hp -= amount;
+        this.damageCooldown = 0.6;
+        state.shake = Math.min(12, state.shake + 4);
+        if (this.hp <= 0){
+          gameOver();
+        }
+      }
+      draw(){
+        // Player body
+        ctx.save();
+        // subtle recoil offset
+        const rx = -Math.cos(this.aim)*this.recoil*2;
+        const ry = -Math.sin(this.aim)*this.recoil*2;
+        ctx.translate(rx, ry);
+
+        // glow
+        ctx.fillStyle = '#14161c';
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.r+6, 0, TAU);
+        ctx.fill();
+
+        // body
+        ctx.fillStyle = '#3aa3ff';
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.r, 0, TAU);
+        ctx.fill();
+
+        // barrel line
+        ctx.strokeStyle = '#cde6ff';
+        ctx.lineWidth = 6;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y);
+        ctx.lineTo(this.x + Math.cos(this.aim)*(this.r+14),
+                   this.y + Math.sin(this.aim)*(this.r+14));
+        ctx.stroke();
+
+        // eye
+        ctx.fillStyle = '#0b1020';
+        ctx.beginPath();
+        ctx.arc(this.x + Math.cos(this.aim)*8,
+                this.y + Math.sin(this.aim)*8, 3, 0, TAU);
+        ctx.fill();
+
+        ctx.restore();
+      }
+    }
+
+    class Bullet{
+      constructor(x,y,vx,vy, ttl, dmg){
+        this.x=x; this.y=y; this.vx=vx; this.vy=vy;
+        this.ttl=ttl; this.r=3;
+        this.dmg=dmg;
+      }
+      update(dt){
+        this.x += this.vx*dt;
+        this.y += this.vy*dt;
+        this.ttl -= dt;
+      }
+      draw(){
+        ctx.fillStyle = '#ffd166';
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.r, 0, TAU);
+        ctx.fill();
+      }
+    }
+
+    class Zombie{
+      constructor(x,y, hp, speed){
+        this.x=x; this.y=y;
+        this.r=18;
+        this.hp=hp;
+        this.speed=speed;
+        this.hurtTimer = 0;
+      }
+      update(dt){
+        // Move towards player
+        const dx = state.player.x - this.x;
+        const dy = state.player.y - this.y;
+        const m = norm(dx,dy);
+        this.x += m.x*this.speed*dt;
+        this.y += m.y*this.speed*dt;
+        if (this.hurtTimer>0) this.hurtTimer -= dt;
+
+        // If touches player
+        const rr = (this.r + state.player.r);
+        if (dist2(this, state.player) < rr*rr){
+          state.player.hurt(12);
+          // small knockback
+          this.x -= m.x*12;
+          this.y -= m.y*12;
+        }
+      }
+      hurt(dmg){
+        this.hp -= dmg;
+        this.hurtTimer = 0.1;
+      }
+      draw(){
+        // flash if hurt
+        const color = this.hurtTimer>0 ? '#a6f7a6' : '#66cc66';
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.r, 0, TAU);
+        ctx.fill();
+
+        // mouth
+        ctx.fillStyle = '#0a0';
+        ctx.fillRect(this.x-5, this.y+2, 10, 3);
+      }
+    }
+
+    function spawnZombie(){
+      // Spawn just outside one of the edges
+      const edge = randInt(0,3); // 0 top,1 right,2 bottom,3 left
+      const margin = 40;
+      let x,y;
+      if (edge===0){ x = rand(-margin, state.w+margin); y = -margin; }
+      else if (edge===2){ x = rand(-margin, state.w+margin); y = state.h+margin; }
+      else if (edge===1){ x = state.w+margin; y = rand(-margin, state.h+margin); }
+      else { x = -margin; y = rand(-margin, state.h+margin); }
+
+      const t = state.time;
+      const hp = 90 + t*3; // scale over time
+      const sp = clamp(80 + t*0.8, 80, 150);
+      state.zombies.push(new Zombie(x,y,hp, sp));
+    }
+
+    function gameOver(){
+      state.running = false;
+      overlay.classList.add('show');
+      final.textContent = 'Счёт: ' + state.score;
+    }
+
+    function restart(){
+      state.score = 0;
+      state.time = 0;
+      state.spawnTimer = 0;
+      state.spawnInterval = 1.1;
+      state.bullets.length = 0;
+      state.zombies.length = 0;
+      state.player = new Player(state.w*0.5, state.h*0.5);
+      state.running = true;
+      overlay.classList.remove('show');
+      uiScore.textContent = 'Score: 0';
+      uiHP.textContent = 'HP: 100';
+    }
+
+    function update(dt){
+      state.time += dt;
+      // Increase difficulty
+      state.spawnInterval = clamp(1.1 - state.time*0.0015, 0.32, 1.1);
+      state.spawnTimer -= dt;
+      if (state.spawnTimer <= 0 && state.running){
+        spawnZombie();
+        state.spawnTimer = state.spawnInterval;
+      }
+
+      state.player.update(dt);
+
+      // Update bullets
+      for (let i=state.bullets.length-1; i>=0; i--){
+        const b = state.bullets[i];
+        b.update(dt);
+        // Out of bounds or expired
+        if (b.ttl <= 0 || b.x<-50 || b.y<-50 || b.x>state.w+50 || b.y>state.h+50){
+          state.bullets.splice(i,1);
+        }
+      }
+
+      // Update zombies and collisions
+      for (let i=state.zombies.length-1; i>=0; i--){
+        const z = state.zombies[i];
+        z.update(dt);
+        // bullets collide
+        for (let j=state.bullets.length-1; j>=0; j--){
+          const b = state.bullets[j];
+          const rr = (z.r + b.r);
+          if (dist2(z, b) < rr*rr){
+            z.hurt(b.dmg);
+            state.bullets.splice(j,1);
+          }
+        }
+        if (z.hp <= 0){
+          state.zombies.splice(i,1);
+          state.score += 1;
+        }
+      }
+
+      uiScore.textContent = 'Score: ' + state.score;
+      uiHP.textContent = 'HP: ' + clamp(Math.ceil(state.player.hp),0,999);
+
+      // screen shake
+      state.shake = Math.max(0, state.shake - 40*dt);
+    }
+
+    function render(){
+      // background
+      const shakeX = state.shake ? rand(-state.shake, state.shake) : 0;
+      const shakeY = state.shake ? rand(-state.shake, state.shake) : 0;
+      ctx.save();
+      ctx.translate(shakeX, shakeY);
+      ctx.fillStyle = '#0e0f14';
+      ctx.fillRect(-100,-100, state.w+200, state.h+200);
+
+      // subtle grid
+      ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+      ctx.lineWidth = 1;
+      const grid = 40;
+      for (let x= (state.time*20)%grid; x<state.w; x+=grid){
+        ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,state.h); ctx.stroke();
+      }
+      for (let y= (state.time*12)%grid; y<state.h; y+=grid){
+        ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(state.w,y); ctx.stroke();
+      }
+
+      // Entities
+      for (const b of state.bullets) b.draw();
+      for (const z of state.zombies) z.draw();
+      state.player.draw();
+
+      ctx.restore();
+
+      // crosshair
+      ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(state.mouse.x, state.mouse.y, 10, 0, TAU);
+      ctx.moveTo(state.mouse.x-14, state.mouse.y);
+      ctx.lineTo(state.mouse.x-4, state.mouse.y);
+      ctx.moveTo(state.mouse.x+14, state.mouse.y);
+      ctx.lineTo(state.mouse.x+4, state.mouse.y);
+      ctx.moveTo(state.mouse.x, state.mouse.y-14);
+      ctx.lineTo(state.mouse.x, state.mouse.y-4);
+      ctx.moveTo(state.mouse.x, state.mouse.y+14);
+      ctx.lineTo(state.mouse.x, state.mouse.y+4);
+      ctx.stroke();
+    }
+
+    // Main loop
+    let last = performance.now();
+    function loop(now){
+      const dt = Math.min(0.033, (now - last)/1000);
+      last = now;
+      if (state.player) {
+        if (state.running) update(dt);
+        render();
+      }
+      requestAnimationFrame(loop);
+    }
+
+    // Start
+    restart();
+    requestAnimationFrame(loop);
+  })();
+  </script>
+</body>
+</html>
