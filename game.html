@@ -178,8 +178,6 @@
           z.hurt(140 + 160*fall);
         }
       }
-      // finally place explosive barrels near the ring
-      initBarrels();
     }
 
     function initBarrels(){
@@ -899,6 +897,8 @@
           state.covers.push(cov);
         }
       }
+      // place explosive barrels after covers are placed
+      initBarrels();
     }
 
     function update(dt){
