@@ -62,6 +62,7 @@
       explosions: [],
       barrels: [],
       quips: [],
+      scorches: [],
       covers: [],
       draggingCover: null,
       phase: 'fight', // always fight; covers are pushed physically
@@ -129,6 +130,20 @@
       }
     }
 
+    class Scorch{
+      constructor(x,y){ this.x=x; this.y=y; this.r=70; this.ttl=18; }
+      update(dt){ this.ttl -= dt; }
+      draw(){
+        const t = Math.max(0, Math.min(1, this.ttl/18));
+        const alpha = 0.25 * t;
+        const grad = ctx.createRadialGradient(this.x, this.y, 10, this.x, this.y, this.r);
+        grad.addColorStop(0, `rgba(0,0,0,${alpha})`);
+        grad.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath(); ctx.arc(this.x, this.y, this.r, 0, TAU); ctx.fill();
+      }
+    }
+
     class Barrel{
       constructor(x,y){ this.x=x; this.y=y; this.r=14; this.alive=true; }
       update(dt){ /* no-op for now; reserved for flicker/bob */ }
@@ -149,7 +164,7 @@
     }
 
     class Explosion{
-      constructor(x,y){ this.x=x; this.y=y; this.ttl=0.4; this.elapsed=0; this.r0=12; this.r1=120; }
+      constructor(x,y){ this.x=x; this.y=y; this.ttl=0.4; this.elapsed=0; this.r0=12; this.r1=300; }
       update(dt){ this.elapsed += dt; this.ttl -= dt; }
       draw(){
         const t = clamp(this.elapsed/0.4, 0, 1);
@@ -168,14 +183,26 @@
       state.explosions.push(new Explosion(x,y));
       state.shake = Math.max(state.shake, 14);
       audio.explosion();
+      // scorch mark
+      state.scorches.push(new Scorch(x,y));
       // damage zombies only
-      const R = 120;
+      const R = 300;
       for (const z of state.zombies){
         const dx = z.x - x, dy = z.y - y; const d2 = dx*dx+dy*dy;
         if (d2 < R*R){
           const d = Math.sqrt(d2);
           const fall = 1 - d/R;
           z.hurt(140 + 160*fall);
+        }
+      }
+      // chain to nearby barrels
+      const chainR = 110;
+      for (let i=state.barrels.length-1; i>=0; i--){
+        const br = state.barrels[i];
+        const dx = br.x - x, dy = br.y - y;
+        if (dx*dx + dy*dy <= chainR*chainR){
+          state.barrels.splice(i,1);
+          triggerExplosion(br.x, br.y);
         }
       }
     }
@@ -1029,6 +1056,13 @@
         if (e.ttl <= 0) state.explosions.splice(i,1);
       }
 
+      // Update scorches
+      for (let i=state.scorches.length-1; i>=0; i--){
+        const s = state.scorches[i];
+        s.update(dt);
+        if (s.ttl <= 0) state.scorches.splice(i,1);
+      }
+
       // Update splats (fade and cleanup)
       for (let i=state.splats.length-1; i>=0; i--){
         const s = state.splats[i];
@@ -1090,6 +1124,7 @@
 
       // Entities
       for (const s of state.splats) s.draw();
+      for (const sc of state.scorches) sc.draw();
       // covers
       for (const c of state.covers) c.draw();
       // barrels
