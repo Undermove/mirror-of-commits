@@ -639,10 +639,10 @@
         }
       }
       shoot(){
-        const basePellets = 15;
+        const basePellets = 7;
         const pellets = Math.max(5, basePellets + randInt(-1, 1)); // small per-shot variation
         const spreadBase = 0.15; // narrower cone
-        const spread = spreadBase * rand(0.8, 1.0); // per-shot variation
+        const spread = spreadBase * rand(0.8, 1.3); // per-shot variation
         const speed = 1200; // faster bullets
         const dmg = 70; // more lethal
         const aimOffset = rand(-0.04, 0.04); // slight per-shot offset
