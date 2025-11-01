@@ -16,6 +16,16 @@
     .panel { background: rgba(20,20,26,.9); padding: 24px 28px; border: 1px solid rgba(255,255,255,.1); border-radius: 12px; text-align: center; box-shadow: 0 8px 30px rgba(0,0,0,.6); }
     .panel h1 { margin: 0 0 8px; font-size: 24px; }
     .panel p { margin: 6px 0 0; opacity: .85; }
+    .upgrade-grid { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 12px; }
+    .upgrade-btn { cursor: pointer; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,.15); background: rgba(255,255,255,0.04); color: #fff; font-weight: 600; text-align: left; position: relative; }
+    .upgrade-btn:hover { background: rgba(255,255,255,0.08); }
+    .upgrade-btn:focus-visible { outline: 2px dashed #7cd1ff; outline-offset: 2px; }
+    .upgrade-note { opacity: .85; font-size: 13px; margin-top: 6px; }
+    .upgrade-btn[disabled] { opacity: .5; cursor: not-allowed; }
+    .label-row { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+    .lvl { opacity:.9; font-weight:700; }
+    .progress { height: 6px; border-radius: 6px; background: rgba(255,255,255,0.08); overflow:hidden; margin-top:8px; }
+    .progress-fill { height:100%; width:0%; background: linear-gradient(90deg, #5bd7ff, #7aff8f); border-radius: inherit; box-shadow: 0 0 8px rgba(123,255,168,0.5); }
   </style>
 </head>
 <body>
@@ -35,6 +45,33 @@
       <p>Нажмите R для рестарта</p>
     </div>
   </div>
+  
+  <div class="overlay" id="upgrade">
+    <div class="panel">
+      <h1>Прокачка дробовика</h1>
+      <p>Волна зачищена. Выберите одно улучшение (каждое до 5 раз):</p>
+      <div class="upgrade-grid">
+        <button class="upgrade-btn" id="upg-damage">
+          <div class="label-row"><span>💥 Урон +20% (толще ствол)</span><span class="lvl" id="lvl-damage">0/5</span></div>
+          <div class="progress"><div class="progress-fill" id="bar-damage"></div></div>
+        </button>
+        <button class="upgrade-btn" id="upg-stopping">
+          <div class="label-row"><span>🧊 Останавливающая сила (сильнее и дольше, ствол длиннее)</span><span class="lvl" id="lvl-stopping">0/5</span></div>
+          <div class="progress"><div class="progress-fill" id="bar-stopping"></div></div>
+        </button>
+        <button class="upgrade-btn" id="upg-speed">
+          <div class="label-row"><span>🚀 Скорость пули +15% (вид «круче»)</span><span class="lvl" id="lvl-speed">0/5</span></div>
+          <div class="progress"><div class="progress-fill" id="bar-speed"></div></div>
+        </button>
+        <button class="upgrade-btn" id="upg-pellets">
+          <div class="label-row"><span>🔱 Кол-во пуль +2 (добавляет ствол)</span><span class="lvl" id="lvl-pellets">0/5</span></div>
+          <div class="progress"><div class="progress-fill" id="bar-pellets"></div></div>
+        </button>
+        <button class="upgrade-btn" id="upg-endless" style="display:none; text-align:center">⚔️ Дерись до конца!</button>
+      </div>
+      <p class="upgrade-note">Внешний вид дробовика меняется и сочетается с другими апгрейдами.</p>
+    </div>
+  </div>
 
   <script>
   (() => {
@@ -46,6 +83,25 @@
     const uiCountdown = document.getElementById('countdown');
     const overlay = document.getElementById('gameover');
     const final = document.getElementById('final');
+    const upgOverlay = document.getElementById('upgrade');
+    const btnDamage = document.getElementById('upg-damage');
+    const btnStopping = document.getElementById('upg-stopping');
+    const btnSpeed = document.getElementById('upg-speed');
+    const btnPellets = document.getElementById('upg-pellets');
+    const btnEndless = document.getElementById('upg-endless');
+    const barDamage = document.getElementById('bar-damage');
+    const barStopping = document.getElementById('bar-stopping');
+    const barSpeed = document.getElementById('bar-speed');
+    const barPellets = document.getElementById('bar-pellets');
+    const lblDamage = document.getElementById('lvl-damage');
+    const lblStopping = document.getElementById('lvl-stopping');
+    const lblSpeed = document.getElementById('lvl-speed');
+    const lblPellets = document.getElementById('lvl-pellets');
+    if (btnDamage) btnDamage.addEventListener('click', ()=>applyUpgrade('damage'));
+    if (btnStopping) btnStopping.addEventListener('click', ()=>applyUpgrade('stopping'));
+    if (btnSpeed) btnSpeed.addEventListener('click', ()=>applyUpgrade('speed'));
+    if (btnPellets) btnPellets.addEventListener('click', ()=>applyUpgrade('pellets'));
+    if (btnEndless) btnEndless.addEventListener('click', ()=>startEndless());
 
     const state = {
       w: 0, h: 0, dpr: window.devicePixelRatio || 1,
@@ -65,14 +121,19 @@
       scorches: [],
       covers: [],
       draggingCover: null,
-      phase: 'fight', // always fight; covers are pushed physically
+      phase: 'fight',
       zombiesSpawned: 0,
       weakPhase: true,
       weakSide: 0,
       shotsFired: 0,
       nextQuipAt: 35,
       player: null,
-      shake: 0
+      shake: 0,
+      wave: 1,
+      waveCap: 190,
+      waveCapped: false,
+      endlessShown: false,
+      endlessMode: false
     };
 
     function resize() {
@@ -82,6 +143,12 @@
       canvas.width = Math.floor(state.w * state.dpr);
       canvas.height = Math.floor(state.h * state.dpr);
       ctx.setTransform(state.dpr,0,0,state.dpr,0,0);
+    }
+
+    // Wave cap progression: 130, 160, 190, ... (+30 per wave)
+    function getWaveCap(w){
+      const n = Math.max(1, Math.floor(w||1));
+      return 130 + (n-1)*30;
     }
 
     class Cover{
@@ -589,6 +656,25 @@
         this.reloadDuration = 1.0; // seconds to refill magazine
         // movement velocity for pushing
         this.moveVx = 0; this.moveVy = 0;
+        // Weapon core stats
+        this.baseDamage = 70;
+        this.damageMul = 1.0;
+        this.pelletsBase = 7;
+        this.pelletBonus = 0;
+        this.bulletSpeedBase = 1200;
+        this.bulletSpeedMul = 1.0;
+        this.stopLevel = 0; // stopping power level
+        this.slowFactorBase = 0.6;
+        this.slowDurationBase = 0.6;
+        // Visuals (combine additively)
+        this.barrelCount = 1;
+        this.barrelLength = 14; // added to radius
+        this.barrelThickness = 6;
+        this.coolTier = 0; // 0..n for cosmetic extras
+        // Upgrade levels (0..5)
+        this.damageLevel = 0;
+        this.pelletsLevel = 0;
+        this.speedLevel = 0;
       }
       update(dt){
         // Movement
@@ -643,13 +729,15 @@
         }
       }
       shoot(){
-        const basePellets = 7;
-        const pellets = Math.max(5, basePellets + randInt(-1, 1)); // small per-shot variation
-        const spreadBase = 0.15; // narrower cone
-        const spread = spreadBase * rand(0.8, 1.3); // per-shot variation
-        const speed = 1200; // faster bullets
-        const dmg = 70; // more lethal
-        const aimOffset = rand(-0.04, 0.04); // slight per-shot offset
+        const basePellets = this.pelletsBase + this.pelletBonus;
+        const pellets = Math.max(3, basePellets + randInt(-1, 1));
+        const spreadBase = 0.15;
+        const spread = spreadBase * rand(0.8, 1.3);
+        const speed = this.bulletSpeedBase * this.bulletSpeedMul;
+        const dmg = this.baseDamage * this.damageMul;
+        const slowFactor = Math.max(0.2, this.slowFactorBase - 0.06 * this.stopLevel);
+        const slowDuration = this.slowDurationBase + 0.12 * this.stopLevel;
+        const aimOffset = rand(-0.04, 0.04);
         const baseAim = this.aim + aimOffset;
 
         for (let i=0;i<pellets;i++){
@@ -658,7 +746,7 @@
           const vy = Math.sin(a)*speed;
           const px = this.x + Math.cos(this.aim)*this.r*0.8;
           const py = this.y + Math.sin(this.aim)*this.r*0.8;
-          state.bullets.push(new Bullet(px,py,vx,vy, dmg));
+          state.bullets.push(new Bullet(px,py,vx,vy, dmg, slowFactor, slowDuration));
         }
         // Recoil and screen shake
         this.recoil += 1;
@@ -717,15 +805,38 @@
         ctx.arc(this.x, this.y, this.r, 0, TAU);
         ctx.fill();
 
-        // barrel line
-        ctx.strokeStyle = '#cde6ff';
-        ctx.lineWidth = 6;
-        ctx.lineCap = 'round';
-        ctx.beginPath();
-        ctx.moveTo(this.x, this.y);
-        ctx.lineTo(this.x + Math.cos(this.aim)*(this.r+14),
-                   this.y + Math.sin(this.aim)*(this.r+14));
-        ctx.stroke();
+        // shotgun barrels (visual upgrades combined)
+        const L = this.r + this.barrelLength;
+        const lw = this.barrelThickness;
+        const c = Math.cos(this.aim), s = Math.sin(this.aim);
+        const px = -s, py = c; // perpendicular
+        const count = Math.max(1, this.barrelCount);
+        const gap = 6; // spacing between barrels
+        for (let i=0;i<count;i++){
+          const t = (i - (count-1)/2) * gap;
+          const ox = this.x + px * t;
+          const oy = this.y + py * t;
+          // color depends on coolTier
+          const hue = Math.min(200, 160 + this.coolTier*10);
+          ctx.strokeStyle = `hsl(${hue}, 80%, 85%)`;
+          ctx.lineWidth = lw;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(ox, oy);
+          ctx.lineTo(ox + c*L, oy + s*L);
+          ctx.stroke();
+          // small muzzle brake fins if coolTier
+          if (this.coolTier>0){
+            ctx.strokeStyle = `rgba(255,255,255,${0.15 + 0.08*this.coolTier})`;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(ox + c*(L-6) + px*3, oy + s*(L-6) + py*3);
+            ctx.lineTo(ox + c*L + px*5, oy + s*L + py*5);
+            ctx.moveTo(ox + c*(L-6) - px*3, oy + s*(L-6) - py*3);
+            ctx.lineTo(ox + c*L - px*5, oy + s*L - py*5);
+            ctx.stroke();
+          }
+        }
 
         // eye
         ctx.fillStyle = '#0b1020';
@@ -769,11 +880,13 @@
     }
 
     class Bullet{
-      constructor(x,y,vx,vy, dmg){
+      constructor(x,y,vx,vy, dmg, slowFactor, slowDuration){
         this.x=x; this.y=y; this.vx=vx; this.vy=vy;
         this.px=x; this.py=y; // previous position for trail
         this.r=3; // collision radius (visual tip is smaller)
         this.dmg=dmg;
+        this.slowFactor = slowFactor;
+        this.slowDuration = slowDuration;
       }
       update(dt){
         this.px = this.x; this.py = this.y;
@@ -916,14 +1029,23 @@
     }
 
     function spawnWave(){
+      // Endless mode: spawn continuously without cap
+      if (state.endlessMode){
+        spawnOneZombie(false);
+        return;
+      }
+      // stop spawning if wave cap reached
+      if (state.zombiesSpawned >= state.waveCap){ state.waveCapped = true; return; }
       if (state.weakPhase){
-        const left = Math.max(0, 100 - state.zombiesSpawned);
-        const n = Math.min(left, randInt(3,7));
+        const leftWeak = Math.max(0, 100 - state.zombiesSpawned);
+        const leftToCap = Math.max(0, state.waveCap - state.zombiesSpawned);
+        const n = Math.min(leftWeak, leftToCap, randInt(3,7));
         for (let i=0;i<n;i++) spawnOneZombie(true);
         if (state.zombiesSpawned >= 100) state.weakPhase = false;
       } else {
-        spawnOneZombie(false);
+        if (state.zombiesSpawned < state.waveCap) spawnOneZombie(false);
       }
+      if (state.zombiesSpawned >= state.waveCap) state.waveCapped = true;
     }
 
     function gameOver(){
@@ -941,6 +1063,11 @@
       state.zombiesSpawned = 0;
       state.weakPhase = true;
       state.weakSide = randInt(0,3); // choose a side for weak horde
+      state.wave = 1;
+      state.waveCap = getWaveCap(state.wave);
+      state.waveCapped = false;
+      state.endlessShown = false;
+      state.endlessMode = false;
       state.bullets.length = 0;
       state.zombies.length = 0;
       state.splats.length = 0;
@@ -955,6 +1082,7 @@
       state.phase = 'fight';
       state.running = true;
       overlay.classList.remove('show');
+      if (upgOverlay) upgOverlay.classList.remove('show');
       uiScore.textContent = 'Score: 0';
       uiHP.textContent = 'HP: 100';
     }
@@ -1014,7 +1142,9 @@
       // Spawning always while running
       state.spawnTimer -= dt;
       if (state.spawnTimer <= 0 && state.running){
-        spawnWave();
+        if (!state.waveCapped) {
+          spawnWave();
+        }
         state.spawnTimer = state.spawnInterval;
       }
 
@@ -1115,8 +1245,12 @@
           const rr = (z.r + b.r);
           if (dist2(z, b) < rr*rr){
             z.hurt(b.dmg);
-            // apply brief slow on hit (affects all tiers)
-            if (typeof z.applySlow === 'function') z.applySlow(0.6, 0.6);
+            // apply slow based on bullet params
+            if (typeof z.applySlow === 'function') {
+              const f = (b.slowFactor!=null? b.slowFactor : 0.6);
+              const d = (b.slowDuration!=null? b.slowDuration : 0.6);
+              z.applySlow(f, d);
+            }
             audio.hit();
             state.bullets.splice(j,1);
           }
@@ -1193,6 +1327,11 @@
 
       // screen shake
       state.shake = Math.max(0, state.shake - 40*dt);
+
+      // Wave completion -> open upgrade menu
+      if (state.running && state.waveCapped && state.zombies.length === 0){
+        showUpgrade();
+      }
     }
 
     function render(){
@@ -1277,6 +1416,92 @@
     // Start
     restart();
     requestAnimationFrame(loop);
+
+    // Upgrades & Waves
+    function isAllMaxed(){
+      const p = state.player; if (!p) return false;
+      const MAX=5;
+      return (p.damageLevel>=MAX && p.pelletsLevel>=MAX && p.speedLevel>=MAX && p.stopLevel>=MAX);
+    }
+    function showUpgrade(){
+      state.running = false;
+      state.phase = 'upgrade';
+      if (upgOverlay) upgOverlay.classList.add('show');
+      updateUpgradeUI();
+    }
+    function applyUpgrade(kind){
+      const p = state.player; if (!p) return;
+      const MAX=5;
+      if (kind === 'damage'){
+        if (p.damageLevel >= MAX) return;
+        p.damageLevel += 1;
+        p.damageMul *= 1.2; // +20% per level
+        p.barrelThickness = Math.min(12, p.barrelThickness + 1.2);
+      } else if (kind === 'stopping'){
+        if (p.stopLevel >= MAX) return;
+        p.stopLevel = Math.min(MAX, p.stopLevel + 1);
+        p.barrelLength = Math.min(32, p.barrelLength + 2);
+      } else if (kind === 'speed'){
+        if (p.speedLevel >= MAX) return;
+        p.speedLevel += 1;
+        p.bulletSpeedMul *= 1.15;
+        p.coolTier = Math.min(MAX, p.speedLevel);
+      } else if (kind === 'pellets'){
+        if (p.pelletsLevel >= MAX) return;
+        p.pelletsLevel += 1;
+        p.pelletBonus += 2;
+        p.barrelCount = Math.min(4, 1 + p.pelletsLevel);
+      }
+      updateUpgradeUI();
+      if (isAllMaxed() && !state.endlessShown){
+        state.quips.push({text: 'Дерись до конца!', ttl: 6.5, age: 0});
+        state.endlessShown = true;
+      }
+      startNextWave();
+    }
+    function updateUpgradeUI(){
+      const p = state.player; if (!p) return;
+      const MAX=5;
+      const set = (btn, bar, lbl, val) => {
+        if (lbl) lbl.textContent = `${val}/${MAX}`;
+        if (bar) bar.style.width = `${Math.min(100, (val/MAX)*100)}%`;
+        if (btn) btn.disabled = (val >= MAX);
+      };
+      set(btnDamage, barDamage, lblDamage, p.damageLevel||0);
+      set(btnStopping, barStopping, lblStopping, p.stopLevel||0);
+      set(btnSpeed, barSpeed, lblSpeed, p.speedLevel||0);
+      set(btnPellets, barPellets, lblPellets, p.pelletsLevel||0);
+      if (btnEndless) btnEndless.style.display = isAllMaxed() ? 'block' : 'none';
+    }
+    function startNextWave(){
+      if (upgOverlay) upgOverlay.classList.remove('show');
+      state.wave += 1;
+      state.score = 0; // reset score between waves
+      state.zombiesSpawned = 0;
+      state.waveCapped = false;
+      state.weakPhase = true;
+      state.weakSide = randInt(0,3);
+      state.spawnTimer = 2.0;
+      state.waveCap = getWaveCap(state.wave);
+      initBarrels();
+      state.phase = 'fight';
+      state.running = true;
+    }
+    function startEndless(){
+      if (upgOverlay) upgOverlay.classList.remove('show');
+      state.endlessMode = true;
+      state.waveCapped = false;
+      state.zombiesSpawned = 0;
+      state.spawnTimer = 2.0;
+      state.score = 0; // reset score for endless
+      initBarrels();
+      state.phase = 'fight';
+      state.running = true;
+      if (!state.endlessShown){
+        state.quips.push({text: 'Дерись до конца!', ttl: 6.5, age: 0});
+        state.endlessShown = true;
+      }
+    }
   })();
   </script>
 </body>
