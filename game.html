@@ -33,8 +33,10 @@
     <div class="stat" id="score">Score: 0</div>
     <div class="stat" id="health">HP: 100</div>
     <div class="stat" id="ammo">Ammo: </div>
+    <div class="stat" id="wave">Wave: 1</div>
+    <div class="stat" id="cleared">Cleared: 0</div>
     <div class="stat" id="countdown"></div>
-    <div class="hint">WASD: движение • Мышь: прицел • ЛКМ: стрелять • R: рестарт</div>
+    <div class="hint">WASD: движение • Мышь: прицел • ЛКМ: стрелять • P: пауза • R: рестарт</div>
   </div>
   <canvas id="game"></canvas>
 
@@ -43,6 +45,12 @@
       <h1>Вы померли. Зомби сожрали ваши мозги</h1>
       <p id="final">Счёт: 0</p>
       <p>Нажмите R для рестарта</p>
+    </div>
+  </div>
+  <div class="overlay" id="pause">
+    <div class="panel">
+      <h1>Пауза</h1>
+      <p>Нажмите P для продолжения</p>
     </div>
   </div>
   
@@ -84,6 +92,9 @@
     const overlay = document.getElementById('gameover');
     const final = document.getElementById('final');
     const upgOverlay = document.getElementById('upgrade');
+    const pauseOverlay = document.getElementById('pause');
+    const uiWave = document.getElementById('wave');
+    const uiCleared = document.getElementById('cleared');
     const btnDamage = document.getElementById('upg-damage');
     const btnStopping = document.getElementById('upg-stopping');
     const btnSpeed = document.getElementById('upg-speed');
@@ -134,7 +145,12 @@
       waveCapped: false,
       endlessShown: false,
       endlessMode: false,
-      zombieId: 0
+      zombieId: 0,
+      waveStartTime: 0,
+      surgeActive: false,
+      wavesCleared: 0,
+      waveTallied: false,
+      paused: false
     };
 
     function resize() {
@@ -160,7 +176,22 @@
     // Wave cap progression: 130, 160, 190, ... (+30 per wave)
     function getWaveCap(w){
       const n = Math.max(1, Math.floor(w||1));
-      return 130 + (n-1)*30;
+      return 70 + (n-1)*30;
+    }
+
+    // Early waves stretched, from wave 5 compressed a bit
+    function waveDifficultyK(w){
+      if (w < 3) return 0.6;     // much slower growth
+      if (w < 5) return 0.8;     // still softer
+      return 1.1;                // from wave 5 compress a bit (faster ramp)
+    }
+
+    function computeSpawnInterval(effT, w){
+      // effT: seconds since wave start; w: current wave
+      const base = 1.15;
+      const decay = (w < 5) ? 0.0010 : 0.0018; // later waves shrink faster
+      const minCap = (w < 5) ? 0.25 : 0.38;    // early waves keep more breathing room
+      return clamp(base - effT*decay, minCap, 1.2);
     }
 
     class Cover{
@@ -276,13 +307,18 @@
       }
       // chain to nearby barrels
       const chainR = 110;
+      const targets = [];
       for (let i=state.barrels.length-1; i>=0; i--){
         const br = state.barrels[i];
+        if (!br) continue;
         const dx = br.x - x, dy = br.y - y;
         if (dx*dx + dy*dy <= chainR*chainR){
+          targets.push({x: br.x, y: br.y});
           state.barrels.splice(i,1);
-          triggerExplosion(br.x, br.y);
         }
+      }
+      for (const p of targets){
+        triggerExplosion(p.x, p.y);
       }
     }
 
@@ -326,6 +362,7 @@
         e.preventDefault();
       }
       if (code === 'KeyR') { if (!state.running) restart(); }
+      if (code === 'KeyP') { togglePause(); }
       state.keys.add(code);
     });
     window.addEventListener('keyup', (e) => state.keys.delete(e.code));
@@ -1077,18 +1114,22 @@
         const hp = rand(25, 50);
         const sp = rand(70, 110);
         const scale = rand(0.85, 1.0);
-        const vis = Math.max(0, Math.floor(state.wave*0.6) + randInt(0,1));
+        const vis = Math.max(0, Math.floor(state.wave*0.4) + randInt(0,1));
         const z = new Zombie(x,y,hp, sp, 0, 6, scale, ++state.zombieId, vis);
         state.zombies.push(z);
       } else {
-        const t = state.time;
-        const tier = Math.min(3, Math.floor(t/40));
-        const hp = 110 + t*4 + tier*30;
-        const sp = clamp(90 + t*0.9 + tier*5, 90, 180);
+        const effT = Math.max(0, state.time - state.waveStartTime);
+        const k = waveDifficultyK(state.wave);
+        const t = effT * k;
+        const tier = Math.min(3, Math.floor(t/55));
+        const hpBase = 90 + state.wave*6;
+        const hp = hpBase + t*3 + tier*35;
+        const sp = clamp(85 + t*0.6 + tier*4, 85, 180);
         const scale = 1.0 + tier*0.05;
-        const coverDmg = 18 + tier*10;
+        const coverDmg = 16 + tier*8;
         const vis = Math.max(1,
-          Math.floor(state.wave) + tier*2 + (state.endlessMode ? Math.floor(state.time/60) : 0)
+          Math.floor(state.wave * (state.wave<5 ? 0.6 : 0.9)) + tier*(state.wave<5 ? 1 : 2)
+            + (state.endlessMode ? Math.floor(state.time/60) : 0)
         );
         const z = new Zombie(x,y,hp, sp, tier, coverDmg, scale, ++state.zombieId, vis);
         state.zombies.push(z);
@@ -1111,7 +1152,19 @@
         for (let i=0;i<n;i++) spawnOneZombie(true);
         if (state.zombiesSpawned >= 100) state.weakPhase = false;
       } else {
-        if (state.zombiesSpawned < state.waveCap) spawnOneZombie(false);
+        if (state.zombiesSpawned < state.waveCap){
+          // End-of-wave surge: spawn bursts when close to cap
+          const progress = state.waveCap > 0 ? state.zombiesSpawned / state.waveCap : 0;
+          let burst = 1;
+          if (progress > 0.8) { burst = 2; state.surgeActive = true; }
+          if (progress > 0.9) burst = 3;
+          if (progress > 0.95) burst = 4;
+          if (progress > 0.97) burst = 6;
+          if (progress > 0.99) burst = 8;
+          const leftToCap = state.waveCap - state.zombiesSpawned;
+          burst = Math.min(burst, leftToCap);
+          for (let i=0;i<burst;i++) spawnOneZombie(false);
+        }
       }
       if (state.zombiesSpawned >= state.waveCap) state.waveCapped = true;
     }
@@ -1136,6 +1189,11 @@
       state.waveCapped = false;
       state.endlessShown = false;
       state.endlessMode = false;
+      state.waveStartTime = state.time;
+      state.surgeActive = false;
+      state.wavesCleared = 0;
+      state.waveTallied = false;
+      state.paused = false;
       state.bullets.length = 0;
       state.zombies.length = 0;
       state.splats.length = 0;
@@ -1151,6 +1209,7 @@
       state.running = true;
       overlay.classList.remove('show');
       if (upgOverlay) upgOverlay.classList.remove('show');
+      if (pauseOverlay) pauseOverlay.classList.remove('show');
       uiScore.textContent = 'Score: 0';
       uiHP.textContent = 'HP: 100';
     }
@@ -1205,8 +1264,15 @@
 
     function update(dt){
       state.time += dt;
-      // Increase difficulty
-      state.spawnInterval = clamp(1.1 - state.time*0.0015, 0.32, 1.1);
+      // Increase difficulty (per-wave time)
+      const effT = Math.max(0, state.time - state.waveStartTime);
+      state.spawnInterval = computeSpawnInterval(effT, state.wave);
+      // Accelerate spawns further near end of wave (non-endless)
+      if (!state.endlessMode && state.waveCap>0 && state.zombiesSpawned>0){
+        const progress = state.zombiesSpawned / state.waveCap;
+        if (progress > 0.85) state.spawnInterval *= 0.6;
+        if (progress > 0.93) state.spawnInterval *= 0.6;
+      }
       // Spawning always while running
       state.spawnTimer -= dt;
       if (state.spawnTimer <= 0 && state.running){
@@ -1375,6 +1441,8 @@
       // UI updates
       uiScore.textContent = 'Score: ' + state.score;
       uiHP.textContent = 'HP: ' + clamp(Math.ceil(state.player.hp),0,999);
+      uiWave.textContent = 'Wave: ' + (state.endlessMode ? '∞' : state.wave);
+      uiCleared.textContent = 'Cleared: ' + state.wavesCleared;
       if (state.player){
         const mag = state.player.magSize || 0;
         const ammo = clamp(state.player.ammo, 0, mag);
@@ -1398,6 +1466,7 @@
 
       // Wave completion -> open upgrade menu
       if (state.running && state.waveCapped && state.zombies.length === 0){
+        if (!state.waveTallied){ state.wavesCleared += 1; state.waveTallied = true; }
         showUpgrade();
       }
     }
@@ -1475,7 +1544,7 @@
       const dt = Math.min(0.033, (now - last)/1000);
       last = now;
       if (state.player) {
-        if (state.running) update(dt);
+        if (state.running && !state.paused) update(dt);
         render();
       }
       requestAnimationFrame(loop);
@@ -1551,6 +1620,9 @@
       state.weakSide = randInt(0,3);
       state.spawnTimer = 2.0;
       state.waveCap = getWaveCap(state.wave);
+      state.waveStartTime = state.time;
+      state.surgeActive = false;
+      state.waveTallied = false;
       // regen player hp and rebuild covers & barrels
       if (state.player) state.player.hp = 100;
       state.covers.length = 0;
@@ -1565,6 +1637,9 @@
       state.zombiesSpawned = 0;
       state.spawnTimer = 2.0;
       state.score = 0; // reset score for endless
+      state.waveStartTime = state.time;
+      state.surgeActive = false;
+      state.waveTallied = false;
       // regen player hp and rebuild covers & barrels
       if (state.player) state.player.hp = 100;
       state.covers.length = 0;
@@ -1574,6 +1649,19 @@
       if (!state.endlessShown){
         state.quips.push({text: 'Дерись до конца!', ttl: 6.5, age: 0});
         state.endlessShown = true;
+      }
+    }
+
+    // Pause
+    function togglePause(){
+      if (!state.running || state.phase !== 'fight') return;
+      state.paused = !state.paused;
+      if (state.paused) {
+        if (pauseOverlay) pauseOverlay.classList.add('show');
+        state.mouse.justPressed = false;
+        state.keys.clear();
+      } else {
+        if (pauseOverlay) pauseOverlay.classList.remove('show');
       }
     }
   })();
