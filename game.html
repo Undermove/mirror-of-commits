@@ -52,7 +52,7 @@
       <p>Волна зачищена. Выберите одно улучшение (каждое до 5 раз):</p>
       <div class="upgrade-grid">
         <button class="upgrade-btn" id="upg-damage">
-          <div class="label-row"><span>💥 Урон +20% (толще ствол)</span><span class="lvl" id="lvl-damage">0/5</span></div>
+          <div class="label-row"><span>💥 Урон +50% (толще ствол)</span><span class="lvl" id="lvl-damage">0/5</span></div>
           <div class="progress"><div class="progress-fill" id="bar-damage"></div></div>
         </button>
         <button class="upgrade-btn" id="upg-stopping">
@@ -1435,7 +1435,7 @@
       if (kind === 'damage'){
         if (p.damageLevel >= MAX) return;
         p.damageLevel += 1;
-        p.damageMul *= 1.2; // +20% per level
+        p.damageMul *= 1.6; // +50% per level
         p.barrelThickness = Math.min(12, p.barrelThickness + 1.2);
       } else if (kind === 'stopping'){
         if (p.stopLevel >= MAX) return;
@@ -1449,7 +1449,7 @@
       } else if (kind === 'pellets'){
         if (p.pelletsLevel >= MAX) return;
         p.pelletsLevel += 1;
-        p.pelletBonus += 2;
+        p.pelletBonus += 7;
         p.barrelCount = Math.min(4, 1 + p.pelletsLevel);
       }
       updateUpgradeUI();
@@ -1483,7 +1483,10 @@
       state.weakSide = randInt(0,3);
       state.spawnTimer = 2.0;
       state.waveCap = getWaveCap(state.wave);
-      initBarrels();
+      // regen player hp and rebuild covers & barrels
+      if (state.player) state.player.hp = 100;
+      state.covers.length = 0;
+      initCovers();
       state.phase = 'fight';
       state.running = true;
     }
@@ -1494,7 +1497,10 @@
       state.zombiesSpawned = 0;
       state.spawnTimer = 2.0;
       state.score = 0; // reset score for endless
-      initBarrels();
+      // regen player hp and rebuild covers & barrels
+      if (state.player) state.player.hp = 100;
+      state.covers.length = 0;
+      initCovers();
       state.phase = 'fight';
       state.running = true;
       if (!state.endlessShown){
