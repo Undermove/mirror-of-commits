@@ -23,6 +23,7 @@
     <div class="stat" id="score">Score: 0</div>
     <div class="stat" id="health">HP: 100</div>
     <div class="stat" id="ammo">Ammo: </div>
+    <div class="stat" id="countdown"></div>
     <div class="hint">WASD: движение • Мышь: прицел • ЛКМ: стрелять • R: рестарт</div>
   </div>
   <canvas id="game"></canvas>
@@ -42,6 +43,7 @@
     const uiScore = document.getElementById('score');
     const uiHP = document.getElementById('health');
     const uiAmmo = document.getElementById('ammo');
+    const uiCountdown = document.getElementById('countdown');
     const overlay = document.getElementById('gameover');
     const final = document.getElementById('final');
 
@@ -57,9 +59,17 @@
       bullets: [],
       zombies: [],
       splats: [],
+      explosions: [],
+      barrels: [],
+      quips: [],
       covers: [],
       draggingCover: null,
       phase: 'fight', // always fight; covers are pushed physically
+      zombiesSpawned: 0,
+      weakPhase: true,
+      weakSide: 0,
+      shotsFired: 0,
+      nextQuipAt: 35,
       player: null,
       shake: 0
     };
@@ -94,11 +104,10 @@
         this.cy = clamp(this.cy, r, state.h - r);
       }
       integrate(dt){
-        this.cx += this.vx*dt; this.cy += this.vy*dt; this.angle += this.av*dt;
-        // small friction (damping) — медленное затухание
+        this.cx += this.vx*dt; this.cy += this.vy*dt; // keep angle fixed (no rotation)
+        // small friction (damping) — медленное затухание (линейная), без угловой инерции
         const linD = Math.pow(0.9, dt);  // ~0.9 за секунду
-        const angD = Math.pow(0.85, dt); // ~0.85 за секунду
-        this.vx *= linD; this.vy *= linD; this.av *= angD;
+        this.vx *= linD; this.vy *= linD; this.av = 0;
         this.clampToBounds();
       }
       draw(){
@@ -117,6 +126,81 @@
         // hp bar above
         ctx.fillStyle = 'rgba(200,40,40,0.8)';
         ctx.fillRect(this.cx - this.w*0.5, this.cy - this.h*0.5 - 8, this.w*t, 4);
+      }
+    }
+
+    class Barrel{
+      constructor(x,y){ this.x=x; this.y=y; this.r=14; this.alive=true; }
+      update(dt){ /* no-op for now; reserved for flicker/bob */ }
+      draw(){
+        if (!this.alive) return;
+        ctx.fillStyle = '#cc2a2a';
+        ctx.beginPath(); ctx.arc(this.x, this.y, this.r, 0, TAU); ctx.fill();
+        // fire glyph
+        ctx.fillStyle = '#ffec7a';
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y-6);
+        ctx.quadraticCurveTo(this.x+5, this.y-2, this.x+1, this.y+3);
+        ctx.quadraticCurveTo(this.x-4, this.y+1, this.x, this.y-6);
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(this.x, this.y, this.r-1, 0, TAU); ctx.stroke();
+      }
+    }
+
+    class Explosion{
+      constructor(x,y){ this.x=x; this.y=y; this.ttl=0.4; this.elapsed=0; this.r0=12; this.r1=120; }
+      update(dt){ this.elapsed += dt; this.ttl -= dt; }
+      draw(){
+        const t = clamp(this.elapsed/0.4, 0, 1);
+        const r = this.r0 + (this.r1 - this.r0)*t;
+        const alpha = 0.55 * (1 - t);
+        const grad = ctx.createRadialGradient(this.x, this.y, r*0.2, this.x, this.y, r);
+        grad.addColorStop(0, `rgba(255,230,120,${alpha})`);
+        grad.addColorStop(0.4, `rgba(255,120,20,${alpha*0.8})`);
+        grad.addColorStop(1, 'rgba(255,80,0,0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath(); ctx.arc(this.x, this.y, r, 0, TAU); ctx.fill();
+      }
+    }
+
+    function triggerExplosion(x,y){
+      state.explosions.push(new Explosion(x,y));
+      state.shake = Math.max(state.shake, 14);
+      audio.explosion();
+      // damage zombies only
+      const R = 120;
+      for (const z of state.zombies){
+        const dx = z.x - x, dy = z.y - y; const d2 = dx*dx+dy*dy;
+        if (d2 < R*R){
+          const d = Math.sqrt(d2);
+          const fall = 1 - d/R;
+          z.hurt(140 + 160*fall);
+        }
+      }
+      // finally place explosive barrels near the ring
+      initBarrels();
+    }
+
+    function initBarrels(){
+      state.barrels.length = 0;
+      const cx = state.w*0.5, cy = state.h*0.5;
+      const R = Math.max(120, Math.min(state.w, state.h)*0.25);
+      const count = randInt(3, 5);
+      let tries = 0;
+      while (state.barrels.length < count && tries < 60){
+        tries++;
+        const theta = rand(0, TAU);
+        const dist = R + rand(-40, 60);
+        const x = cx + Math.cos(theta)*dist;
+        const y = cy + Math.sin(theta)*dist;
+        const b = new Barrel(x,y);
+        // avoid overlapping player spawn and covers
+        if (Math.hypot(x-cx, y-cy) < 60) continue;
+        let bad=false;
+        for (const c of state.covers){ if (Math.hypot(x-c.cx, y-c.cy) < b.r + c.radius() + 8){ bad=true; break; } }
+        for (const other of state.barrels){ if (Math.hypot(x-other.x, y-other.y) < b.r + other.r + 20){ bad=true; break; } }
+        if (!bad) state.barrels.push(b);
       }
     }
     window.addEventListener('resize', resize, {passive:true});
@@ -150,6 +234,38 @@
     const rectsOverlap = (ax,ay,aw,ah, bx,by,bw,bh)=> ax < bx+bw && ax+aw > bx && ay < by+bh && ay+ah > by;
     const dot = (ax,ay,bx,by)=> ax*bx + ay*by;
     const rot = (x,y, c,s)=>({x: c*x - s*y, y: s*x + c*y});
+    const QUIPS = [
+      "I'm hobo with a shotgun!",
+      "Not a dinner with a shotgun!",
+      "Damn, reloading!",
+      "Hasta la vista, zombos!",
+      "Who ordered lead salad?",
+      "Brains? Not today.",
+      "Boom headshot!",
+      "Two for one!",
+      "Keep 'em coming!",
+      "This is my boomstick!",
+      "No refunds!",
+      "Free samples of buckshot!",
+      "You shall not pass!",
+      "Click-clack party.",
+      "Next!",
+      "Messy business.",
+      "Clean-up on aisle 3!",
+      "Holes need more holes!",
+      "Mind the splatter.",
+      "Ammo diet starts tomorrow.",
+      "Stay down!",
+      "You look terrible.",
+      "Reloading, cover me!",
+      "Tactical reposition!",
+      "Keep your distance.",
+      "No autographs!",
+      "I hate cardio.",
+      "Spicy!",
+      "Knock knock!",
+      "This is fine."
+    ];
     function circleOBBCollision(cov, px, py, pr){
       const c = Math.cos(cov.angle), s = Math.sin(cov.angle);
       // to local space
@@ -326,6 +442,23 @@
         osc.frequency.exponentialRampToValueAtTime(90, now+0.1);
         osc.connect(g2); g2.connect(ctx.destination); osc.start(now); osc.stop(now+0.13);
       },
+      explosion(){
+        // Big boom: noise burst + low thump
+        this.ensure(); if (!this.ctx) return;
+        const ctx=this.ctx; const now=ctx.currentTime;
+        const dur = 0.35;
+        const buffer = ctx.createBuffer(1, Math.floor(ctx.sampleRate*dur), ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i=0;i<data.length;i++) data[i] = (Math.random()*2-1) * (1 - i/data.length) * 0.9;
+        const src = ctx.createBufferSource(); src.buffer = buffer;
+        const lp = ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value = 1200; lp.Q.value = 0.6;
+        const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, now); g.gain.exponentialRampToValueAtTime(1.3, now+0.015); g.gain.exponentialRampToValueAtTime(0.0001, now+dur);
+        src.connect(lp); lp.connect(g); g.connect(ctx.destination); src.start(now); src.stop(now+dur);
+        const osc = ctx.createOscillator(); osc.type='sine';
+        const g2 = ctx.createGain(); g2.gain.setValueAtTime(0.0001, now); g2.gain.exponentialRampToValueAtTime(0.5, now+0.02); g2.gain.exponentialRampToValueAtTime(0.0001, now+0.25);
+        osc.frequency.setValueAtTime(140, now); osc.frequency.exponentialRampToValueAtTime(60, now+0.22);
+        osc.connect(g2); g2.connect(ctx.destination); osc.start(now); osc.stop(now+0.26);
+      },
       gameOver(){
         this.ensure(); if (!this.ctx) return;
         const ctx=this.ctx; const now=ctx.currentTime;
@@ -444,6 +577,15 @@
         this.reloadSfxTimer = Math.min(0.25, this.fireRate * 0.6);
         // consume ammo
         this.ammo = Math.max(0, this.ammo - 1);
+        // quip trigger every N shots
+        state.shotsFired += 1;
+        if (state.shotsFired >= state.nextQuipAt){
+          const text = QUIPS[randInt(0, QUIPS.length-1)];
+          state.quips.push({text, ttl: 2.6, age: 0});
+          state.nextQuipAt += randInt(30,50);
+          // keep at most 3 lines
+          while (state.quips.length > 3) state.quips.shift();
+        }
         // auto-start reload if empty
         if (this.ammo === 0) this.startReload();
       }
@@ -568,11 +710,14 @@
     }
 
     class Zombie{
-      constructor(x,y, hp, speed){
+      constructor(x,y, hp, speed, tier, coverDmgRate, scale){
         this.x=x; this.y=y;
-        this.r=18;
+        this.tier = Math.max(0, Math.floor(tier||0));
+        this.scale = scale || 1;
+        this.r = 18 * this.scale * (1 + 0.08*this.tier);
         this.hp=hp;
         this.speed=speed;
+        this.coverDmgRate = coverDmgRate || 20;
         this.hurtTimer = 0;
       }
       update(dt){
@@ -598,33 +743,83 @@
         this.hurtTimer = 0.1;
       }
       draw(){
-        // flash if hurt
-        const color = this.hurtTimer>0 ? '#a6f7a6' : '#66cc66';
+        // palette per tier
+        const palette = ['#74d874','#5cc45c','#46a946','#318431'];
+        const baseCol = palette[Math.min(this.tier, palette.length-1)];
+        const color = this.hurtTimer>0 ? '#a6f7a6' : baseCol;
         ctx.fillStyle = color;
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.r, 0, TAU);
         ctx.fill();
 
+        // face changes with tier
+        // eyes
+        ctx.fillStyle = '#0b1020';
+        const e = Math.max(2, this.r*0.12);
+        ctx.beginPath(); ctx.arc(this.x - this.r*0.25, this.y - this.r*0.15, e, 0, TAU); ctx.fill();
+        ctx.beginPath(); ctx.arc(this.x + this.r*0.25, this.y - this.r*0.12, e, 0, TAU); ctx.fill();
         // mouth
-        ctx.fillStyle = '#0a0';
-        ctx.fillRect(this.x-5, this.y+2, 10, 3);
+        if (this.tier <= 0){
+          ctx.fillStyle = '#0a0';
+          ctx.fillRect(this.x-5, this.y+2, 10, 3);
+        } else if (this.tier === 1){
+          ctx.fillStyle = '#083';
+          ctx.fillRect(this.x-8, this.y+3, 16, 4);
+        } else {
+          // big mouth with simple fangs
+          ctx.fillStyle = '#062';
+          ctx.fillRect(this.x-10, this.y+3, 20, 5);
+          ctx.fillStyle = '#fff';
+          ctx.beginPath(); ctx.moveTo(this.x-4, this.y+3); ctx.lineTo(this.x-2, this.y+8); ctx.lineTo(this.x, this.y+3); ctx.closePath(); ctx.fill();
+          ctx.beginPath(); ctx.moveTo(this.x+4, this.y+3); ctx.lineTo(this.x+2, this.y+8); ctx.lineTo(this.x, this.y+3); ctx.closePath(); ctx.fill();
+        }
       }
     }
 
-    function spawnZombie(){
-      // Spawn just outside one of the edges
-      const edge = randInt(0,3); // 0 top,1 right,2 bottom,3 left
+    function spawnOneZombie(weak){
+      // Spawn one zombie just outside one of the edges
+      let edge;
+      if (weak){
+        // First weak wave — strictly from one chosen side; later weak waves biased ~80%
+        if (state.zombiesSpawned === 0) edge = state.weakSide;
+        else edge = (Math.random() < 0.8) ? state.weakSide : randInt(0,3);
+      } else {
+        edge = randInt(0,3); // 0 top,1 right,2 bottom,3 left
+      }
       const margin = 40;
       let x,y;
       if (edge===0){ x = rand(-margin, state.w+margin); y = -margin; }
       else if (edge===2){ x = rand(-margin, state.w+margin); y = state.h+margin; }
       else if (edge===1){ x = state.w+margin; y = rand(-margin, state.h+margin); }
       else { x = -margin; y = rand(-margin, state.h+margin); }
+      if (weak){
+        const hp = rand(25, 50);
+        const sp = rand(70, 110);
+        const scale = rand(0.85, 1.0);
+        const z = new Zombie(x,y,hp, sp, 0, 6, scale);
+        state.zombies.push(z);
+      } else {
+        const t = state.time;
+        const tier = Math.min(3, Math.floor(t/40));
+        const hp = 110 + t*4 + tier*30;
+        const sp = clamp(90 + t*0.9 + tier*5, 90, 180);
+        const scale = 1.0 + tier*0.05;
+        const coverDmg = 18 + tier*10;
+        const z = new Zombie(x,y,hp, sp, tier, coverDmg, scale);
+        state.zombies.push(z);
+      }
+      state.zombiesSpawned += 1;
+    }
 
-      const t = state.time;
-      const hp = 90 + t*3; // scale over time
-      const sp = clamp(80 + t*0.8, 80, 150);
-      state.zombies.push(new Zombie(x,y,hp, sp));
+    function spawnWave(){
+      if (state.weakPhase){
+        const left = Math.max(0, 100 - state.zombiesSpawned);
+        const n = Math.min(left, randInt(3,7));
+        for (let i=0;i<n;i++) spawnOneZombie(true);
+        if (state.zombiesSpawned >= 100) state.weakPhase = false;
+      } else {
+        spawnOneZombie(false);
+      }
     }
 
     function gameOver(){
@@ -639,9 +834,17 @@
       state.time = 0;
       state.spawnTimer = 10; // delay first zombie spawn by 10s
       state.spawnInterval = 1.1;
+      state.zombiesSpawned = 0;
+      state.weakPhase = true;
+      state.weakSide = randInt(0,3); // choose a side for weak horde
       state.bullets.length = 0;
       state.zombies.length = 0;
       state.splats.length = 0;
+      state.explosions.length = 0;
+      state.barrels.length = 0;
+      state.quips.length = 0;
+      state.shotsFired = 0;
+      state.nextQuipAt = randInt(30,50);
       state.covers.length = 0;
       initCovers();
       state.player = new Player(state.w*0.5, state.h*0.5);
@@ -705,7 +908,7 @@
       // Spawning always while running
       state.spawnTimer -= dt;
       if (state.spawnTimer <= 0 && state.running){
-        spawnZombie();
+        spawnWave();
         state.spawnTimer = state.spawnInterval;
       }
 
@@ -736,8 +939,6 @@
           const rpx = col.cx - c.cx; const rpy = col.cy - c.cy;
           c.vx += col.nx * (J * c.invMass);
           c.vy += col.ny * (J * c.invMass);
-          const torque = (rpx*col.ny - rpy*col.nx) * J;
-          c.av += torque * c.invInertia;
           c.clampToBounds();
           // avoid overlaps with other covers via circle bounds, revert if overlapping badly
           for (let m=0; m<state.covers.length; m++){
@@ -745,7 +946,7 @@
             const o = state.covers[m];
             if (Math.hypot(c.cx - o.cx, c.cy - o.cy) < c.radius() + o.radius() - 6){
               c.cx += col.nx * (sep * coverShare); c.cy += col.ny * (sep * coverShare);
-              c.vx *= 0.3; c.vy *= 0.3; c.av *= 0.3;
+              c.vx *= 0.3; c.vy *= 0.3;
               break;
             }
           }
@@ -759,10 +960,27 @@
         }
       }
 
-      // Update bullets
+      // Update bullets and check barrel hits
       for (let i=state.bullets.length-1; i>=0; i--){
         const b = state.bullets[i];
         b.update(dt);
+        // hit barrels
+        let exploded = false;
+        for (let bi=state.barrels.length-1; bi>=0; bi--){
+          const br = state.barrels[bi];
+          if (!br.alive) continue;
+          const rr = br.r + b.r;
+          const dx = b.x - br.x, dy = b.y - br.y;
+          if (dx*dx + dy*dy <= rr*rr){
+            br.alive = false;
+            state.barrels.splice(bi,1);
+            triggerExplosion(br.x, br.y);
+            state.bullets.splice(i,1);
+            exploded = true;
+            break;
+          }
+        }
+        if (exploded) continue;
         // Despawn beyond map bounds
         if (b.x < -DESPAWN_MARGIN || b.y < -DESPAWN_MARGIN || b.x > state.w + DESPAWN_MARGIN || b.y > state.h + DESPAWN_MARGIN){
           state.bullets.splice(i,1);
@@ -781,7 +999,7 @@
             // push zombie out along normal
             z.x += col.nx * col.depth; z.y += col.ny * col.depth;
             // damage cover gradually
-            c.hp -= 25*dt;
+            c.hp -= (z.coverDmgRate||20)*dt;
             if (c.hp <= 0){ state.covers.splice(k,1); continue; }
           }
         }
@@ -804,6 +1022,13 @@
         }
       }
 
+      // Update explosions
+      for (let i=state.explosions.length-1; i>=0; i--){
+        const e = state.explosions[i];
+        e.update(dt);
+        if (e.ttl <= 0) state.explosions.splice(i,1);
+      }
+
       // Update splats (fade and cleanup)
       for (let i=state.splats.length-1; i>=0; i--){
         const s = state.splats[i];
@@ -811,9 +1036,34 @@
         if (s.ttl <= 0) state.splats.splice(i,1);
       }
 
+      // Update quips
+      for (let i=state.quips.length-1; i>=0; i--){
+        const q = state.quips[i];
+        q.age = (q.age||0) + dt;
+        q.ttl -= dt;
+        if (q.ttl <= 0) state.quips.splice(i,1);
+      }
+
+      // Update barrels
+      for (let i=state.barrels.length-1; i>=0; i--){
+        const br = state.barrels[i];
+        br.update(dt);
+        if (!br.alive) state.barrels.splice(i,1);
+      }
+      // Update covers AFTER handling all collisions/pushes; stop if not pushed
+      for (const c of state.covers){
+        if (!c.pushed){ c.vx = 0; c.vy = 0; c.av = 0; }
+        c.integrate(dt);
+      }
+      // UI updates
       uiScore.textContent = 'Score: ' + state.score;
       uiHP.textContent = 'HP: ' + clamp(Math.ceil(state.player.hp),0,999);
-      uiAmmo.textContent = 'Ammo: ' + '🔋'.repeat(state.player ? state.player.ammo : 0) + (state.player && state.player.reloading ? ' (reload...)' : '');
+      uiAmmo.textContent = 'Ammo: ' + (state.player ? (state.player.ammo + ' / ' + state.player.magSize) : '') + (state.player && state.player.reloading ? ' (reload...)' : '');
+      if (state.spawnTimer > 0){
+        uiCountdown.textContent = 'До атаки: ' + Math.max(0, state.spawnTimer).toFixed(1) + 's';
+      } else {
+        uiCountdown.textContent = '';
+      }
 
       // screen shake
       state.shake = Math.max(0, state.shake - 40*dt);
@@ -825,7 +1075,6 @@
       const shakeY = state.shake ? rand(-state.shake, state.shake) : 0;
       ctx.save();
       ctx.translate(shakeX, shakeY);
-      ctx.fillStyle = '#0e0f14';
       ctx.fillRect(-100,-100, state.w+200, state.h+200);
 
       // subtle grid
@@ -843,9 +1092,30 @@
       for (const s of state.splats) s.draw();
       // covers
       for (const c of state.covers) c.draw();
+      // barrels
+      for (const br of state.barrels) br.draw();
       for (const b of state.bullets) b.draw();
       for (const z of state.zombies) z.draw();
+      // explosions overlay
+      for (const e of state.explosions) e.draw();
       state.player.draw();
+
+      // quips above player
+      if (state.quips.length){
+        const baseY = state.player.y - state.player.r - 26;
+        ctx.font = '16px monospace';
+        ctx.textAlign = 'center';
+        for (let i=0;i<state.quips.length;i++){
+          const q = state.quips[i];
+          const y = baseY - i*18 - (q.age||0)*8;
+          const alpha = Math.min(1, Math.max(0, q.ttl/2));
+          ctx.strokeStyle = `rgba(0,0,0,${0.7*alpha})`;
+          ctx.lineWidth = 3; ctx.lineJoin='round';
+          ctx.strokeText(q.text, state.player.x, y);
+          ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+          ctx.fillText(q.text, state.player.x, y);
+        }
+      }
 
       ctx.restore();
 
