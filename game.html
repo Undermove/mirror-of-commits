@@ -210,8 +210,8 @@
     function initBarrels(){
       state.barrels.length = 0;
       const cx = state.w*0.5, cy = state.h*0.5;
-      const R = Math.max(120, Math.min(state.w, state.h)*0.25);
-      const count = randInt(3, 5);
+      const R = Math.max(120, Math.min(state.w, state.h)*0.3);
+      const count = randInt(8, 30);
       let tries = 0;
       while (state.barrels.length < count && tries < 60){
         tries++;
@@ -365,31 +365,63 @@
         this.ensure(); if (!this.ctx) return;
         const ctx = this.ctx; const now = ctx.currentTime;
         const dur = 0.22 + Math.random()*0.05;
-        // white noise burst
+        // main body noise
         const buffer = ctx.createBuffer(1, Math.floor(ctx.sampleRate*dur), ctx.sampleRate);
         const data = buffer.getChannelData(0);
         for (let i=0;i<data.length;i++) data[i] = (Math.random()*2-1) * (1 - i/data.length);
         const src = ctx.createBufferSource(); src.buffer = buffer;
-        const bp = ctx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value = 1200 + Math.random()*500; bp.Q.value = 0.6;
-        const lp = ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value = 2200 + Math.random()*800; lp.Q.value = 0.2;
-        const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, now); g.gain.exponentialRampToValueAtTime(1.0, now+0.01); g.gain.exponentialRampToValueAtTime(0.0001, now+dur);
-        src.connect(bp); bp.connect(lp); lp.connect(g); g.connect(ctx.destination);
+        const bp = ctx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value = 1300 + Math.random()*500; bp.Q.value = 0.7;
+        const lp = ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value = 2600 + Math.random()*600; lp.Q.value = 0.25;
+        // soft clip shaper for fatter transient
+        const shaper = ctx.createWaveShaper();
+        const curve = new Float32Array(256); for (let i=0;i<256;i++){ const x=i/255*2-1; curve[i] = Math.tanh(2.6*x); } shaper.curve = curve; shaper.oversample='2x';
+        const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, now); g.gain.exponentialRampToValueAtTime(1.35, now+0.007); g.gain.exponentialRampToValueAtTime(0.0001, now+dur);
+        src.connect(bp); bp.connect(lp); lp.connect(shaper); shaper.connect(g); g.connect(ctx.destination);
         src.start(now); src.stop(now+dur);
-        // low thump
+        // transient click layer
+        const src2 = ctx.createBufferSource(); src2.buffer = buffer;
+        const hp = ctx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value = 1800; hp.Q.value = 0.7;
+        const gClick = ctx.createGain(); gClick.gain.setValueAtTime(0.0001, now); gClick.gain.exponentialRampToValueAtTime(0.5, now+0.004); gClick.gain.exponentialRampToValueAtTime(0.0001, now+0.05);
+        src2.connect(hp); hp.connect(gClick); gClick.connect(ctx.destination);
+        src2.start(now); src2.stop(now+0.06);
+        // double low thump
         const osc = ctx.createOscillator(); osc.type='sine';
-        osc.frequency.setValueAtTime(120, now);
-        osc.frequency.exponentialRampToValueAtTime(60, now+0.08);
-        const g2 = ctx.createGain(); g2.gain.setValueAtTime(0.0001, now); g2.gain.exponentialRampToValueAtTime(0.4, now+0.005); g2.gain.exponentialRampToValueAtTime(0.0001, now+0.1);
-        osc.connect(g2); g2.connect(ctx.destination); osc.start(now); osc.stop(now+0.11);
+        osc.frequency.setValueAtTime(140, now);
+        osc.frequency.exponentialRampToValueAtTime(65, now+0.09);
+        const g2 = ctx.createGain(); g2.gain.setValueAtTime(0.0001, now); g2.gain.exponentialRampToValueAtTime(0.55, now+0.004); g2.gain.exponentialRampToValueAtTime(0.0001, now+0.12);
+        osc.connect(g2); g2.connect(ctx.destination); osc.start(now); osc.stop(now+0.12);
+        const osc2 = ctx.createOscillator(); osc2.type='triangle';
+        osc2.frequency.setValueAtTime(90, now);
+        osc2.frequency.exponentialRampToValueAtTime(55, now+0.08);
+        const g3 = ctx.createGain(); g3.gain.setValueAtTime(0.0001, now); g3.gain.exponentialRampToValueAtTime(0.28, now+0.006); g3.gain.exponentialRampToValueAtTime(0.0001, now+0.1);
+        osc2.connect(g3); g3.connect(ctx.destination); osc2.start(now); osc2.stop(now+0.11);
+        // metallic ping (tiny)
+        const ping = ctx.createOscillator(); ping.type='triangle';
+        ping.frequency.setValueAtTime(1800, now+0.01);
+        ping.frequency.exponentialRampToValueAtTime(900, now+0.06);
+        const gPing = ctx.createGain(); gPing.gain.setValueAtTime(0.0001, now+0.01); gPing.gain.exponentialRampToValueAtTime(0.12, now+0.015); gPing.gain.exponentialRampToValueAtTime(0.0001, now+0.07);
+        ping.connect(gPing); gPing.connect(ctx.destination); ping.start(now+0.01); ping.stop(now+0.08);
       },
       hit(){
         this.ensure(); if (!this.ctx) return;
         const ctx=this.ctx; const now=ctx.currentTime;
-        const osc = ctx.createOscillator(); osc.type='square';
-        const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, now); g.gain.exponentialRampToValueAtTime(0.3, now+0.005); g.gain.exponentialRampToValueAtTime(0.0001, now+0.06);
-        osc.frequency.setValueAtTime(1500, now);
-        osc.frequency.exponentialRampToValueAtTime(800, now+0.06);
-        osc.connect(g); g.connect(ctx.destination); osc.start(now); osc.stop(now+0.07);
+        // wet slap noise
+        const dur = 0.07;
+        const buffer = ctx.createBuffer(1, Math.floor(ctx.sampleRate*dur), ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i=0;i<data.length;i++) data[i] = (Math.random()*2-1) * (1 - i/data.length);
+        const src = ctx.createBufferSource(); src.buffer = buffer;
+        const bp = ctx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value = 900; bp.Q.value = 1.0;
+        const lp = ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value = 1400; lp.Q.value = 0.7;
+        const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, now); g.gain.exponentialRampToValueAtTime(0.55, now+0.004); g.gain.exponentialRampToValueAtTime(0.0001, now+dur);
+        src.connect(bp); bp.connect(lp); lp.connect(g); g.connect(ctx.destination);
+        src.start(now); src.stop(now+dur);
+        // short thud
+        const osc = ctx.createOscillator(); osc.type='sine';
+        osc.frequency.setValueAtTime(220, now);
+        osc.frequency.exponentialRampToValueAtTime(120, now+0.06);
+        const g2 = ctx.createGain(); g2.gain.setValueAtTime(0.0001, now); g2.gain.exponentialRampToValueAtTime(0.35, now+0.003); g2.gain.exponentialRampToValueAtTime(0.0001, now+0.08);
+        osc.connect(g2); g2.connect(ctx.destination); osc.start(now); osc.stop(now+0.08);
       },
       hurt(){
         this.ensure(); if (!this.ctx) return;
@@ -412,22 +444,32 @@
       reload(){
         this.ensure(); if (!this.ctx) return;
         const ctx = this.ctx; const now = ctx.currentTime;
-        // Pump-action: short down-up pitch sweep + click
-        const osc = ctx.createOscillator(); osc.type = 'square';
-        const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, now);
-        g.gain.exponentialRampToValueAtTime(0.2, now+0.02);
-        g.gain.exponentialRampToValueAtTime(0.0001, now+0.18);
-        osc.frequency.setValueAtTime(380, now);
-        osc.frequency.exponentialRampToValueAtTime(240, now+0.08);
-        osc.frequency.exponentialRampToValueAtTime(320, now+0.16);
-        osc.connect(g); g.connect(ctx.destination); osc.start(now); osc.stop(now+0.19);
-        // subtle click
-        const click = ctx.createOscillator(); click.type='triangle';
-        const g2 = ctx.createGain(); g2.gain.setValueAtTime(0.0001, now+0.11);
-        g2.gain.exponentialRampToValueAtTime(0.15, now+0.12);
-        g2.gain.exponentialRampToValueAtTime(0.0001, now+0.17);
-        click.frequency.setValueAtTime(800, now+0.11);
-        click.connect(g2); g2.connect(ctx.destination); click.start(now+0.11); click.stop(now+0.18);
+        // Stage A: pull back "chik" — swish + click
+        const durA = 0.11;
+        const bufA = ctx.createBuffer(1, Math.floor(ctx.sampleRate*durA), ctx.sampleRate);
+        const dA = bufA.getChannelData(0); for (let i=0;i<dA.length;i++) dA[i] = (Math.random()*2-1) * (1 - i/dA.length);
+        const a = ctx.createBufferSource(); a.buffer = bufA;
+        const aHP = ctx.createBiquadFilter(); aHP.type='highpass'; aHP.frequency.value = 900; aHP.Q.value = 0.8;
+        const aG = ctx.createGain(); aG.gain.setValueAtTime(0.0001, now); aG.gain.exponentialRampToValueAtTime(0.35, now+0.02); aG.gain.exponentialRampToValueAtTime(0.0001, now+durA);
+        a.connect(aHP); aHP.connect(aG); aG.connect(ctx.destination); a.start(now); a.stop(now+durA);
+        const aClick = ctx.createOscillator(); aClick.type='square';
+        const aCG = ctx.createGain(); aCG.gain.setValueAtTime(0.0001, now+0.02); aCG.gain.exponentialRampToValueAtTime(0.25, now+0.03); aCG.gain.exponentialRampToValueAtTime(0.0001, now+0.09);
+        aClick.frequency.setValueAtTime(1200, now+0.02);
+        aClick.connect(aCG); aCG.connect(ctx.destination); aClick.start(now+0.02); aClick.stop(now+0.1);
+        // Stage B: push forward "chak" — heavier swish + metal clack
+        const tB = now + 0.12;
+        const durB = 0.12;
+        const bufB = ctx.createBuffer(1, Math.floor(ctx.sampleRate*durB), ctx.sampleRate);
+        const dB = bufB.getChannelData(0); for (let i=0;i<dB.length;i++) dB[i] = (Math.random()*2-1) * (1 - i/dB.length);
+        const b = ctx.createBufferSource(); b.buffer = bufB;
+        const bBP = ctx.createBiquadFilter(); bBP.type='bandpass'; bBP.frequency.value = 1000; bBP.Q.value = 0.9;
+        const bG = ctx.createGain(); bG.gain.setValueAtTime(0.0001, tB); bG.gain.exponentialRampToValueAtTime(0.45, tB+0.02); bG.gain.exponentialRampToValueAtTime(0.0001, tB+durB);
+        b.connect(bBP); bBP.connect(bG); bG.connect(ctx.destination); b.start(tB); b.stop(tB+durB);
+        // metal clack
+        const cl = ctx.createOscillator(); cl.type='triangle';
+        const clG = ctx.createGain(); clG.gain.setValueAtTime(0.0001, tB+0.04); clG.gain.exponentialRampToValueAtTime(0.35, tB+0.045); clG.gain.exponentialRampToValueAtTime(0.0001, tB+0.15);
+        cl.frequency.setValueAtTime(1500, tB+0.04); cl.frequency.exponentialRampToValueAtTime(700, tB+0.12);
+        cl.connect(clG); clG.connect(ctx.destination); cl.start(tB+0.04); cl.stop(tB+0.16);
       },
       reloadMag(){
         // Longer reload gesture for refilling magazine
@@ -742,16 +784,23 @@
         this.r = 18 * this.scale * (1 + 0.08*this.tier);
         this.hp=hp;
         this.speed=speed;
+        this.baseSpeed = speed;
         this.coverDmgRate = coverDmgRate || 20;
         this.hurtTimer = 0;
+        // slow effect
+        this.slowMul = 1; // 1 = no slow; <1 = slowed
+        this.slowTimer = 0;
       }
       update(dt){
         // Move towards player
         const dx = state.player.x - this.x;
         const dy = state.player.y - this.y;
         const m = norm(dx,dy);
-        this.x += m.x*this.speed*dt;
-        this.y += m.y*this.speed*dt;
+        // update slow timer
+        if (this.slowTimer > 0){ this.slowTimer -= dt; if (this.slowTimer <= 0) { this.slowMul = 1; } }
+        const sp = this.baseSpeed * this.slowMul;
+        this.x += m.x*sp*dt;
+        this.y += m.y*sp*dt;
         if (this.hurtTimer>0) this.hurtTimer -= dt;
 
         // If touches player
@@ -766,6 +815,11 @@
       hurt(dmg){
         this.hp -= dmg;
         this.hurtTimer = 0.1;
+      }
+      applySlow(factor, duration){
+        // factor in (0,1], duration in seconds
+        this.slowMul = Math.min(this.slowMul, Math.max(0.2, factor));
+        this.slowTimer = Math.max(this.slowTimer, duration);
       }
       draw(){
         // palette per tier
@@ -1036,6 +1090,8 @@
           const rr = (z.r + b.r);
           if (dist2(z, b) < rr*rr){
             z.hurt(b.dmg);
+            // apply brief slow on hit (affects all tiers)
+            if (typeof z.applySlow === 'function') z.applySlow(0.6, 0.6);
             audio.hit();
             state.bullets.splice(j,1);
           }
