@@ -57,6 +57,9 @@
       bullets: [],
       zombies: [],
       splats: [],
+      covers: [],
+      draggingCover: null,
+      phase: 'fight', // always fight; covers are pushed physically
       player: null,
       shake: 0
     };
@@ -69,6 +72,53 @@
       canvas.height = Math.floor(state.h * state.dpr);
       ctx.setTransform(state.dpr,0,0,state.dpr,0,0);
     }
+
+    class Cover{
+      constructor(x,y,w,h, hp){
+        // x,y as top-left for init; store as center with rotation and velocities
+        this.cx = x + w*0.5; this.cy = y + h*0.5; this.w=w; this.h=h;
+        this.angle = Math.random()*Math.PI*2;
+        this.vx = 0; this.vy = 0; this.av = 0;
+        const area = w*h; const density = 0.002;
+        this.mass = Math.max(1, density*area);
+        this.invMass = 1/this.mass;
+        const I = (this.mass*(w*w + h*h))/12;
+        this.inertia = Math.max(1e-3, I);
+        this.invInertia = 1/this.inertia;
+        this.hp = hp; this.maxHp = hp;
+      }
+      radius(){ return Math.hypot(this.w, this.h)*0.5; }
+      clampToBounds(){
+        const r = this.radius();
+        this.cx = clamp(this.cx, r, state.w - r);
+        this.cy = clamp(this.cy, r, state.h - r);
+      }
+      integrate(dt){
+        this.cx += this.vx*dt; this.cy += this.vy*dt; this.angle += this.av*dt;
+        // small friction (damping) — медленное затухание
+        const linD = Math.pow(0.9, dt);  // ~0.9 за секунду
+        const angD = Math.pow(0.85, dt); // ~0.85 за секунду
+        this.vx *= linD; this.vy *= linD; this.av *= angD;
+        this.clampToBounds();
+      }
+      draw(){
+        const t = clamp(this.hp/this.maxHp, 0, 1);
+        const base = 40 + Math.floor(60*t);
+        ctx.save();
+        ctx.translate(this.cx, this.cy);
+        ctx.rotate(this.angle);
+        ctx.fillStyle = `rgb(${base},${base},${base})`;
+        ctx.fillRect(-this.w*0.5, -this.h*0.5, this.w, this.h);
+        // outline
+        ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(-this.w*0.5+0.5, -this.h*0.5+0.5, this.w-1, this.h-1);
+        ctx.restore();
+        // hp bar above
+        ctx.fillStyle = 'rgba(200,40,40,0.8)';
+        ctx.fillRect(this.cx - this.w*0.5, this.cy - this.h*0.5 - 8, this.w*t, 4);
+      }
+    }
     window.addEventListener('resize', resize, {passive:true});
     resize();
 
@@ -79,7 +129,7 @@
       state.mouse.y = e.clientY - r.top;
     });
     window.addEventListener('mousedown', () => { state.mouse.down = true; state.mouse.justPressed = true; });
-    window.addEventListener('mouseup', () => state.mouse.down = false);
+    window.addEventListener('mouseup', () => { state.mouse.down = false; state.draggingCover = null; });
     window.addEventListener('blur', () => { state.keys.clear(); state.mouse.down = false; });
     window.addEventListener('keydown', (e) => {
       const k = e.key.toLowerCase();
@@ -97,6 +147,67 @@
     const norm = (x,y)=>{const l=length(x,y)||1; return {x:x/l,y:y/l};}
     const dist2 = (a,b)=>{const dx=a.x-b.x, dy=a.y-b.y; return dx*dx+dy*dy; }
     const DESPAWN_MARGIN = 60;
+    const rectsOverlap = (ax,ay,aw,ah, bx,by,bw,bh)=> ax < bx+bw && ax+aw > bx && ay < by+bh && ay+ah > by;
+    const dot = (ax,ay,bx,by)=> ax*bx + ay*by;
+    const rot = (x,y, c,s)=>({x: c*x - s*y, y: s*x + c*y});
+    function circleOBBCollision(cov, px, py, pr){
+      const c = Math.cos(cov.angle), s = Math.sin(cov.angle);
+      // to local space
+      const lx = c*(px - cov.cx) + s*(py - cov.cy);
+      const ly = -s*(px - cov.cx) + c*(py - cov.cy);
+      const hx = cov.w*0.5, hy = cov.h*0.5;
+      const clx = clamp(lx, -hx, hx);
+      const cly = clamp(ly, -hy, hy);
+      const dx = lx - clx, dy = ly - cly;
+      const d2 = dx*dx + dy*dy;
+      if (d2 > pr*pr) return null;
+      const d = Math.sqrt(d2);
+      let nxL, nyL;
+      if (d > 1e-6) { nxL = dx/d; nyL = dy/d; }
+      else {
+        // choose axis outward
+        const rx = Math.min(hx - Math.abs(lx), hy - Math.abs(ly));
+        if (hx - Math.abs(lx) < hy - Math.abs(ly)) { nxL = Math.sign(lx)||1; nyL = 0; }
+        else { nxL = 0; nyL = Math.sign(ly)||1; }
+      }
+      // to world space
+      const nx = c*nxL - s*nyL;
+      const ny = s*nxL + c*nyL;
+      const depth = pr - d;
+      // contact point world
+      const cxw = cov.cx + (c*clx - s*cly);
+      const cyw = cov.cy + (s*clx + c*cly);
+      return {nx, ny, depth, cx: cxw, cy: cyw};
+    }
+
+    // circle-rect collision helper. Returns minimal translation vector {x,y,depth} or null
+    function circleRectMTV(cx,cy,r, rx,ry,rw,rh){
+      // find closest point on rect to circle center
+      const nx = clamp(cx, rx, rx+rw);
+      const ny = clamp(cy, ry, ry+rh);
+      const dx = cx - nx, dy = cy - ny;
+      const d2 = dx*dx + dy*dy;
+      if (d2 === 0){
+        // center is inside rectangle; push out along smallest axis
+        const left = Math.abs(cx - rx);
+        const right = Math.abs(rx+rw - cx);
+        const top = Math.abs(cy - ry);
+        const bottom = Math.abs(ry+rh - cy);
+        const m = Math.min(left,right,top,bottom);
+        if (m === left) return {x: -(r), y: 0, depth: r};
+        if (m === right) return {x: r, y: 0, depth: r};
+        if (m === top) return {x: 0, y: -(r), depth: r};
+        return {x: 0, y: r, depth: r};
+      }
+      if (d2 < r*r){
+        const d = Math.sqrt(d2);
+        const pen = r - d;
+        const nxv = dx / (d||1);
+        const nyv = dy / (d||1);
+        return {x: nxv*pen, y: nyv*pen, depth: pen};
+      }
+      return null;
+    }
 
     // Simple WebAudio synth for SFX (no external files)
     const audio = {
@@ -251,6 +362,8 @@
         this.reloading = false;
         this.reloadTimer = 0;
         this.reloadDuration = 1.0; // seconds to refill magazine
+        // movement velocity for pushing
+        this.moveVx = 0; this.moveVy = 0;
       }
       update(dt){
         // Movement
@@ -261,9 +374,11 @@
         if (state.keys.has('d') || state.keys.has('arrowright')) ax += 1;
         if (ax || ay){
           const m = norm(ax,ay);
+          this.moveVx = m.x*this.speed;
+          this.moveVy = m.y*this.speed;
           this.x += m.x*this.speed*dt;
           this.y += m.y*this.speed*dt;
-        }
+        } else { this.moveVx = 0; this.moveVy = 0; }
         // Clamp to screen
         this.x = clamp(this.x, this.r, state.w - this.r);
         this.y = clamp(this.y, this.r, state.h - this.r);
@@ -392,7 +507,7 @@
     class Splat{
       constructor(x,y){
         this.x=x; this.y=y;
-        this.ttl = 3.5; // seconds
+        this.ttl = 60.5; // seconds
         this.blobs = [];
         const n = randInt(8,14);
         for (let i=0;i<n;i++){
@@ -522,29 +637,127 @@
     function restart(){
       state.score = 0;
       state.time = 0;
-      state.spawnTimer = 0;
+      state.spawnTimer = 10; // delay first zombie spawn by 10s
       state.spawnInterval = 1.1;
       state.bullets.length = 0;
       state.zombies.length = 0;
       state.splats.length = 0;
+      state.covers.length = 0;
+      initCovers();
       state.player = new Player(state.w*0.5, state.h*0.5);
+      state.phase = 'fight';
       state.running = true;
       overlay.classList.remove('show');
       uiScore.textContent = 'Score: 0';
       uiHP.textContent = 'HP: 100';
     }
 
+    function initCovers(){
+      // Build a partial circular ring around the player with gaps, plus a few extra blocks nearby
+      const cx = state.w*0.5, cy = state.h*0.5;
+      const R = Math.max(120, Math.min(state.w, state.h)*0.25);
+      const segments = 12;
+      const thickness = 22;
+      const segLen = 90;
+      // choose gap indices
+      const gapCount = 3;
+      const gapIdx = new Set();
+      while (gapIdx.size < gapCount){ gapIdx.add(randInt(0, segments-1)); }
+      for (let i=0;i<segments;i++){
+        if (gapIdx.has(i)) continue; // leave a hole
+        const theta = (i/segments)*Math.PI*2;
+        const ang = theta + Math.PI*0.5; // tangent orientation
+        const rcx = cx + Math.cos(theta)*R;
+        const rcy = cy + Math.sin(theta)*R;
+        const w = segLen * rand(0.9, 1.1);
+        const h = thickness * rand(0.9, 1.1);
+        const x = rcx - w*0.5;
+        const y = rcy - h*0.5;
+        const hp = Math.floor(260 + (w*h)/18);
+        const cov = new Cover(x,y,w,h,hp);
+        cov.angle = ang;
+        state.covers.push(cov);
+      }
+      // Add a few extra blocks near gaps so player can slide them to close holes
+      for (const gi of gapIdx){
+        const theta = (gi/segments)*Math.PI*2;
+        for (let k=0;k<2;k++){
+          const offset = (k===0? -1 : 1) * rand(40, 80);
+          const rcx = cx + Math.cos(theta)*(R + offset);
+          const rcy = cy + Math.sin(theta)*(R + offset);
+          const ang = theta + Math.PI*0.5;
+          const w = rand(60, 90);
+          const h = rand(18, 26);
+          const x = rcx - w*0.5;
+          const y = rcy - h*0.5;
+          const hp = Math.floor(230 + (w*h)/20);
+          const cov = new Cover(x,y,w,h,hp);
+          cov.angle = ang;
+          state.covers.push(cov);
+        }
+      }
+    }
+
     function update(dt){
       state.time += dt;
       // Increase difficulty
       state.spawnInterval = clamp(1.1 - state.time*0.0015, 0.32, 1.1);
+      // Spawning always while running
       state.spawnTimer -= dt;
       if (state.spawnTimer <= 0 && state.running){
         spawnZombie();
         state.spawnTimer = state.spawnInterval;
       }
 
+      // Mark covers as not pushed this frame
+      for (const c of state.covers) c.pushed = false;
+
       state.player.update(dt);
+      // Player pushes covers with impulse on OBB contact
+      for (let k=0; k<state.covers.length; k++){
+        const c = state.covers[k];
+        const col = circleOBBCollision(c, state.player.x, state.player.y, state.player.r);
+        if (col){
+          // positional correction (split between player and cover)
+          const sep = col.depth + 1e-3;
+          const playerShare = 0.35;
+          const coverShare = 1 - playerShare;
+          state.player.x += col.nx * (sep * playerShare);
+          state.player.y += col.ny * (sep * playerShare);
+          c.cx -= col.nx * (sep * coverShare);
+          c.cy -= col.ny * (sep * coverShare);
+          c.pushed = true;
+          // impulse based on player's movement into normal
+          const mvx = state.player.moveVx, mvy = state.player.moveVy;
+          const mvLen = Math.hypot(mvx, mvy);
+          const dirx = mvLen ? mvx/mvLen : 0, diry = mvLen ? mvy/mvLen : 0;
+          const into = Math.max(0, dirx*col.nx + diry*col.ny);
+          const J = (900 + 900*into) * dt * (mvLen / state.player.speed);
+          const rpx = col.cx - c.cx; const rpy = col.cy - c.cy;
+          c.vx += col.nx * (J * c.invMass);
+          c.vy += col.ny * (J * c.invMass);
+          const torque = (rpx*col.ny - rpy*col.nx) * J;
+          c.av += torque * c.invInertia;
+          c.clampToBounds();
+          // avoid overlaps with other covers via circle bounds, revert if overlapping badly
+          for (let m=0; m<state.covers.length; m++){
+            if (m===k) continue;
+            const o = state.covers[m];
+            if (Math.hypot(c.cx - o.cx, c.cy - o.cy) < c.radius() + o.radius() - 6){
+              c.cx += col.nx * (sep * coverShare); c.cy += col.ny * (sep * coverShare);
+              c.vx *= 0.3; c.vy *= 0.3; c.av *= 0.3;
+              break;
+            }
+          }
+          // extra resolve pass to ensure player is fully outside the cover
+          const col2 = circleOBBCollision(c, state.player.x, state.player.y, state.player.r);
+          if (col2){
+            const sep2 = col2.depth + 0.5;
+            state.player.x += col2.nx * sep2;
+            state.player.y += col2.ny * sep2;
+          }
+        }
+      }
 
       // Update bullets
       for (let i=state.bullets.length-1; i>=0; i--){
@@ -560,6 +773,18 @@
       for (let i=state.zombies.length-1; i>=0; i--){
         const z = state.zombies[i];
         z.update(dt);
+        // resolve zombie collisions with OBB covers and damage them
+        for (let k=state.covers.length-1; k>=0; k--){
+          const c = state.covers[k];
+          const col = circleOBBCollision(c, z.x, z.y, z.r);
+          if (col){
+            // push zombie out along normal
+            z.x += col.nx * col.depth; z.y += col.ny * col.depth;
+            // damage cover gradually
+            c.hp -= 25*dt;
+            if (c.hp <= 0){ state.covers.splice(k,1); continue; }
+          }
+        }
         // bullets collide
         for (let j=state.bullets.length-1; j>=0; j--){
           const b = state.bullets[j];
@@ -616,6 +841,8 @@
 
       // Entities
       for (const s of state.splats) s.draw();
+      // covers
+      for (const c of state.covers) c.draw();
       for (const b of state.bullets) b.draw();
       for (const z of state.zombies) z.draw();
       state.player.draw();
