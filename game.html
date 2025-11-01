@@ -241,11 +241,15 @@
     window.addEventListener('mouseup', () => { state.mouse.down = false; state.draggingCover = null; });
     window.addEventListener('blur', () => { state.keys.clear(); state.mouse.down = false; });
     window.addEventListener('keydown', (e) => {
-      const k = e.key.toLowerCase();
-      if (k === 'r') { if (!state.running) restart(); }
-      state.keys.add(k);
+      const code = e.code;
+      // Prevent page scroll for movement keys
+      if (code === 'ArrowUp' || code === 'ArrowDown' || code === 'ArrowLeft' || code === 'ArrowRight' || code === 'KeyW' || code === 'KeyA' || code === 'KeyS' || code === 'KeyD'){
+        e.preventDefault();
+      }
+      if (code === 'KeyR') { if (!state.running) restart(); }
+      state.keys.add(code);
     });
-    window.addEventListener('keyup', (e) => state.keys.delete(e.key.toLowerCase()));
+    window.addEventListener('keyup', (e) => state.keys.delete(e.code));
 
     // Utils
     const TAU = Math.PI*2;
@@ -589,10 +593,10 @@
       update(dt){
         // Movement
         let ax=0, ay=0;
-        if (state.keys.has('w') || state.keys.has('arrowup')) ay -= 1;
-        if (state.keys.has('s') || state.keys.has('arrowdown')) ay += 1;
-        if (state.keys.has('a') || state.keys.has('arrowleft')) ax -= 1;
-        if (state.keys.has('d') || state.keys.has('arrowright')) ax += 1;
+        if (state.keys.has('KeyW') || state.keys.has('ArrowUp')) ay -= 1;
+        if (state.keys.has('KeyS') || state.keys.has('ArrowDown')) ay += 1;
+        if (state.keys.has('KeyA') || state.keys.has('ArrowLeft')) ax -= 1;
+        if (state.keys.has('KeyD') || state.keys.has('ArrowRight')) ax += 1;
         if (ax || ay){
           const m = norm(ax,ay);
           this.moveVx = m.x*this.speed;
@@ -1169,7 +1173,18 @@
       // UI updates
       uiScore.textContent = 'Score: ' + state.score;
       uiHP.textContent = 'HP: ' + clamp(Math.ceil(state.player.hp),0,999);
-      uiAmmo.textContent = 'Ammo: ' + (state.player ? (state.player.ammo + ' / ' + state.player.magSize) : '') + (state.player && state.player.reloading ? ' (reload...)' : '');
+      if (state.player){
+        const mag = state.player.magSize || 0;
+        const ammo = clamp(state.player.ammo, 0, mag);
+        let icons = '';
+        for (let i=0;i<mag;i++){
+          if (i < ammo) icons += '🔋';
+          else icons += '<span style="opacity:.25">🔋</span>';
+        }
+        uiAmmo.innerHTML = 'Ammo: ' + icons + (state.player.reloading ? ' <span class="hint">(reload...)</span>' : '');
+      } else {
+        uiAmmo.textContent = 'Ammo: ';
+      }
       if (state.spawnTimer > 0){
         uiCountdown.textContent = 'До атаки: ' + Math.max(0, state.spawnTimer).toFixed(1) + 's';
       } else {
