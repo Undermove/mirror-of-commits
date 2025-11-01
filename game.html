@@ -22,6 +22,7 @@
   <div id="ui">
     <div class="stat" id="score">Score: 0</div>
     <div class="stat" id="health">HP: 100</div>
+    <div class="stat" id="ammo">Ammo: </div>
     <div class="hint">WASD: движение • Мышь: прицел • ЛКМ: стрелять • R: рестарт</div>
   </div>
   <canvas id="game"></canvas>
@@ -40,6 +41,7 @@
     const ctx = canvas.getContext('2d');
     const uiScore = document.getElementById('score');
     const uiHP = document.getElementById('health');
+    const uiAmmo = document.getElementById('ammo');
     const overlay = document.getElementById('gameover');
     const final = document.getElementById('final');
 
@@ -51,9 +53,10 @@
       spawnTimer: 0,
       spawnInterval: 1.1,
       keys: new Set(),
-      mouse: {x: 0, y: 0, down: false},
+      mouse: {x: 0, y: 0, down: false, justPressed: false},
       bullets: [],
       zombies: [],
+      splats: [],
       player: null,
       shake: 0
     };
@@ -75,7 +78,7 @@
       state.mouse.x = e.clientX - r.left;
       state.mouse.y = e.clientY - r.top;
     });
-    window.addEventListener('mousedown', () => state.mouse.down = true);
+    window.addEventListener('mousedown', () => { state.mouse.down = true; state.mouse.justPressed = true; });
     window.addEventListener('mouseup', () => state.mouse.down = false);
     window.addEventListener('blur', () => { state.keys.clear(); state.mouse.down = false; });
     window.addEventListener('keydown', (e) => {
@@ -154,6 +157,64 @@
         osc.frequency.exponentialRampToValueAtTime(90, now+0.12);
         osc.connect(g); g.connect(ctx.destination); osc.start(now); osc.stop(now+0.13);
       },
+      reload(){
+        this.ensure(); if (!this.ctx) return;
+        const ctx = this.ctx; const now = ctx.currentTime;
+        // Pump-action: short down-up pitch sweep + click
+        const osc = ctx.createOscillator(); osc.type = 'square';
+        const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, now);
+        g.gain.exponentialRampToValueAtTime(0.2, now+0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, now+0.18);
+        osc.frequency.setValueAtTime(380, now);
+        osc.frequency.exponentialRampToValueAtTime(240, now+0.08);
+        osc.frequency.exponentialRampToValueAtTime(320, now+0.16);
+        osc.connect(g); g.connect(ctx.destination); osc.start(now); osc.stop(now+0.19);
+        // subtle click
+        const click = ctx.createOscillator(); click.type='triangle';
+        const g2 = ctx.createGain(); g2.gain.setValueAtTime(0.0001, now+0.11);
+        g2.gain.exponentialRampToValueAtTime(0.15, now+0.12);
+        g2.gain.exponentialRampToValueAtTime(0.0001, now+0.17);
+        click.frequency.setValueAtTime(800, now+0.11);
+        click.connect(g2); g2.connect(ctx.destination); click.start(now+0.11); click.stop(now+0.18);
+      },
+      reloadMag(){
+        // Longer reload gesture for refilling magazine
+        this.ensure(); if (!this.ctx) return;
+        const ctx=this.ctx; const now=ctx.currentTime;
+        const noiseDur = 0.25;
+        const buffer = ctx.createBuffer(1, Math.floor(ctx.sampleRate*noiseDur), ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i=0;i<data.length;i++) data[i] = (Math.random()*2-1) * (1 - i/data.length);
+        const src = ctx.createBufferSource(); src.buffer = buffer;
+        const lp = ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value = 900; lp.Q.value = 0.7;
+        const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, now); g.gain.exponentialRampToValueAtTime(0.25, now+0.02); g.gain.exponentialRampToValueAtTime(0.0001, now+0.26);
+        src.connect(lp); lp.connect(g); g.connect(ctx.destination); src.start(now); src.stop(now+0.26);
+        // metallic click
+        const osc = ctx.createOscillator(); osc.type='triangle';
+        const g2 = ctx.createGain(); g2.gain.setValueAtTime(0.0001, now+0.18); g2.gain.exponentialRampToValueAtTime(0.2, now+0.2); g2.gain.exponentialRampToValueAtTime(0.0001, now+0.32);
+        osc.frequency.setValueAtTime(700, now+0.18);
+        osc.connect(g2); g2.connect(ctx.destination); osc.start(now+0.18); osc.stop(now+0.33);
+      },
+      splat(){
+        // Wet smash for zombie death
+        this.ensure(); if (!this.ctx) return;
+        const ctx=this.ctx; const now=ctx.currentTime;
+        // noise burst lowpassed + pitch down thump
+        const dur = 0.18;
+        const buffer = ctx.createBuffer(1, Math.floor(ctx.sampleRate*dur), ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i=0;i<data.length;i++) data[i] = (Math.random()*2-1) * (1 - i/data.length);
+        const src = ctx.createBufferSource(); src.buffer = buffer;
+        const lp = ctx.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value = 500; lp.Q.value = 0.9;
+        const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, now); g.gain.exponentialRampToValueAtTime(0.6, now+0.01); g.gain.exponentialRampToValueAtTime(0.0001, now+dur);
+        src.connect(lp); lp.connect(g); g.connect(ctx.destination); src.start(now); src.stop(now+dur);
+        // thump
+        const osc = ctx.createOscillator(); osc.type='sine';
+        const g2 = ctx.createGain(); g2.gain.setValueAtTime(0.0001, now); g2.gain.exponentialRampToValueAtTime(0.35, now+0.005); g2.gain.exponentialRampToValueAtTime(0.0001, now+0.12);
+        osc.frequency.setValueAtTime(180, now);
+        osc.frequency.exponentialRampToValueAtTime(90, now+0.1);
+        osc.connect(g2); g2.connect(ctx.destination); osc.start(now); osc.stop(now+0.13);
+      },
       gameOver(){
         this.ensure(); if (!this.ctx) return;
         const ctx=this.ctx; const now=ctx.currentTime;
@@ -183,6 +244,13 @@
         this.fireRate = 0.28; // seconds between shots
         this.recoil = 0;
         this.damageCooldown = 0; // i-frames
+        this.reloadSfxTimer = 0;
+        // Magazine
+        this.magSize = 6;
+        this.ammo = this.magSize;
+        this.reloading = false;
+        this.reloadTimer = 0;
+        this.reloadDuration = 1.0; // seconds to refill magazine
       }
       update(dt){
         // Movement
@@ -203,18 +271,36 @@
         // Aim
         this.aim = Math.atan2(state.mouse.y - this.y, state.mouse.x - this.x);
 
-        // Shooting
+        // Shooting (click-to-shoot, no autofire on hold)
         this.fireCooldown -= dt;
-        if (state.mouse.down && this.fireCooldown <= 0 && state.running){
+        if (state.mouse.justPressed && this.fireCooldown <= 0 && state.running && !this.reloading && this.ammo > 0){
           this.shoot();
           this.fireCooldown = this.fireRate;
         }
+        // consume click each frame, even if on cooldown
+        state.mouse.justPressed = false;
 
         // Damage cooldown
         this.damageCooldown = Math.max(0, this.damageCooldown - dt);
 
         // Recoil decay
         this.recoil *= Math.pow(0.001, dt); // fast decay
+        // Reload SFX timing
+        if (this.reloadSfxTimer > 0){
+          this.reloadSfxTimer -= dt;
+          if (this.reloadSfxTimer <= 0) audio.reload();
+        }
+        // Magazine reload logic
+        if (this.ammo <= 0 && !this.reloading){
+          this.startReload();
+        }
+        if (this.reloading){
+          this.reloadTimer -= dt;
+          if (this.reloadTimer <= 0){
+            this.ammo = this.magSize;
+            this.reloading = false;
+          }
+        }
       }
       shoot(){
         const basePellets = 7;
@@ -239,6 +325,18 @@
         state.shake = Math.min(10, state.shake + 3);
         // Sound
         audio.shot();
+        // schedule reload sfx
+        this.reloadSfxTimer = Math.min(0.25, this.fireRate * 0.6);
+        // consume ammo
+        this.ammo = Math.max(0, this.ammo - 1);
+        // auto-start reload if empty
+        if (this.ammo === 0) this.startReload();
+      }
+      startReload(){
+        if (this.reloading) return;
+        this.reloading = true;
+        this.reloadTimer = this.reloadDuration;
+        audio.reloadMag();
       }
       hurt(amount){
         if (this.damageCooldown>0) return;
@@ -291,20 +389,65 @@
       }
     }
 
+    class Splat{
+      constructor(x,y){
+        this.x=x; this.y=y;
+        this.ttl = 3.5; // seconds
+        this.blobs = [];
+        const n = randInt(8,14);
+        for (let i=0;i<n;i++){
+          const a = rand(0, TAU);
+          const d = rand(2, 22);
+          const r = rand(2, 8);
+          this.blobs.push({x: this.x + Math.cos(a)*d, y: this.y + Math.sin(a)*d, r});
+        }
+      }
+      update(dt){ this.ttl -= dt; }
+      draw(){
+        const t = Math.max(0, Math.min(1, this.ttl/3.5));
+        const alpha = 0.65 * t;
+        // dark undercoat
+        ctx.fillStyle = `rgba(80,0,0,${alpha})`;
+        for (const b of this.blobs){
+          ctx.beginPath(); ctx.arc(b.x+1, b.y+1, b.r*1.1, 0, TAU); ctx.fill();
+        }
+        // bright blood
+        ctx.fillStyle = `rgba(160,10,10,${alpha})`;
+        for (const b of this.blobs){
+          ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, TAU); ctx.fill();
+        }
+      }
+    }
+
     class Bullet{
       constructor(x,y,vx,vy, dmg){
         this.x=x; this.y=y; this.vx=vx; this.vy=vy;
-        this.r=3;
+        this.px=x; this.py=y; // previous position for trail
+        this.r=3; // collision radius (visual tip is smaller)
         this.dmg=dmg;
       }
       update(dt){
+        this.px = this.x; this.py = this.y;
         this.x += this.vx*dt;
         this.y += this.vy*dt;
       }
       draw(){
-        ctx.fillStyle = '#ffd166';
+        // trail line
+        const ang = Math.atan2(this.vy, this.vx);
+        const len = 14; // constant trail length
+        const tx = this.x - Math.cos(ang)*len;
+        const ty = this.y - Math.sin(ang)*len;
+        ctx.strokeStyle = 'rgba(255,209,102,0.9)';
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
         ctx.beginPath();
-        ctx.arc(this.x, this.y, this.r, 0, TAU);
+        ctx.moveTo(tx, ty);
+        ctx.lineTo(this.x, this.y);
+        ctx.stroke();
+        // small bright tip
+        ctx.fillStyle = '#ffe6a3';
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, 1.2, 0, TAU);
         ctx.fill();
       }
     }
@@ -383,6 +526,7 @@
       state.spawnInterval = 1.1;
       state.bullets.length = 0;
       state.zombies.length = 0;
+      state.splats.length = 0;
       state.player = new Player(state.w*0.5, state.h*0.5);
       state.running = true;
       overlay.classList.remove('show');
@@ -429,12 +573,22 @@
         if (z.hp <= 0){
           state.zombies.splice(i,1);
           state.score += 1;
-          audio.kill();
+          // splat effect
+          state.splats.push(new Splat(z.x, z.y));
+          audio.splat();
         }
+      }
+
+      // Update splats (fade and cleanup)
+      for (let i=state.splats.length-1; i>=0; i--){
+        const s = state.splats[i];
+        s.update(dt);
+        if (s.ttl <= 0) state.splats.splice(i,1);
       }
 
       uiScore.textContent = 'Score: ' + state.score;
       uiHP.textContent = 'HP: ' + clamp(Math.ceil(state.player.hp),0,999);
+      uiAmmo.textContent = 'Ammo: ' + '🔋'.repeat(state.player ? state.player.ammo : 0) + (state.player && state.player.reloading ? ' (reload...)' : '');
 
       // screen shake
       state.shake = Math.max(0, state.shake - 40*dt);
@@ -461,6 +615,7 @@
       }
 
       // Entities
+      for (const s of state.splats) s.draw();
       for (const b of state.bullets) b.draw();
       for (const z of state.zombies) z.draw();
       state.player.draw();
